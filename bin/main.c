@@ -57,12 +57,21 @@ int main(int argc, char** argv)
             printf("received form client: %s\n", data.buf);
 #endif
 
-            cmd_interpret(&result, &res_lines, data.buf, conn, dir_id);
-            for (i = 0; i < res_lines; i++)
+            ret = cmd_interpret(&result, &res_lines, data.buf, conn, dir_id);
+            if (ret == -1)
             {
-                data.data_len = strlen(result[i]) + 1;
-                strcpy(data.buf, result[i]);
+                strcpy(data.buf, "ls: cannot access: No such file or directory");
+                data.data_len = strlen(data.buf) + 1;
                 send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int));
+            }
+            else
+            {
+                for (i = 0; i < res_lines; i++)
+                {
+                    strcpy(data.buf, result[i]);
+                    data.data_len = strlen(data.buf) + 1;
+                    send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int));
+                }
             }
             //send end of transmission
             data.data_len = 0;
