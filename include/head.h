@@ -22,7 +22,7 @@
 #include <mysql/mysql.h>
 
 #define _DEBUG
-#define RESULT_LEN 2000
+#define RESULT_LEN 1000
 
 #endif
 
