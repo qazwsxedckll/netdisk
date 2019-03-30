@@ -51,7 +51,30 @@ MYSQL_RES* sql_select_by_dirid(MYSQL* conn, int dir_id)
     }
 }
 
-MYSQL_RES* sql_select_by_path(MYSQL* conn, char* file_path)
+MYSQL_RES* sql_select_by_id(MYSQL* conn, int id)
+{
+    MYSQL_RES* res = NULL;
+    char query[QUERY_LEN];
+    sprintf(query, "SELECT * FROM file WHERE id = %d", id);
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    int t = mysql_query(conn, query);
+    if (t)
+    {
+#ifdef _DEBUG
+        printf("Error making query:%s\n", mysql_error(conn));
+#endif
+        return NULL;
+    }
+    else
+    {
+        res = mysql_store_result(conn);
+        return res;
+    }
+}
+
+MYSQL_RES* sql_select_by_path(MYSQL* conn, const char* file_path)
 {
     MYSQL_RES* res = NULL;
     char query[QUERY_LEN];

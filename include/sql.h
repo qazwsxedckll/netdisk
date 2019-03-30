@@ -8,6 +8,7 @@ int sql_connect(MYSQL** conn);
 
 MYSQL_RES* sql_select_by_dirid(MYSQL* conn, int dir_id);
 
-MYSQL_RES* sql_select_by_path(MYSQL* conn, char* file_path);
+MYSQL_RES* sql_select_by_path(MYSQL* conn, const char* file_path);
 
+MYSQL_RES* sql_select_by_id(MYSQL* conn, int id);
 #endif
