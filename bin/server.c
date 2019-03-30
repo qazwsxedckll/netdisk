@@ -82,7 +82,7 @@ int que_get(pQue_t pq, pNode_t pNode)
     }
 }
 
-int* tcp_init(int* socketFd, const Config* configs, int n)
+int tcp_init(int* socketFd, const Config* configs, int n)
 {
     char ip_address[20];
     char port[6];
@@ -108,8 +108,11 @@ int* tcp_init(int* socketFd, const Config* configs, int n)
 #ifdef _DEBUG
         printf("bind failed\n");
 #endif
-        return NULL;
+        return -1;
     }
     listen(*socketFd, atoi(max_tcp_connection));
-    return socketFd;
+#ifdef _DEBUG
+    printf("tcp initialized\n");
+#endif
+    return 0;
 }

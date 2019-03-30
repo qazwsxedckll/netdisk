@@ -36,5 +36,5 @@ void que_insert(pQue_t, pNode_t);
 
 int que_get(pQue_t, pNode_t);
 
-int* tcp_init(int*, const Config*, int);
+int tcp_init(int*, const Config*, int);
 #endif

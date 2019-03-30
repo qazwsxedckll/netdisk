@@ -34,5 +34,7 @@ int tran_cmd(int socket_fd)
     data.data_len = read(STDIN_FILENO, data.buf, sizeof(data.buf));
     data.buf[data.data_len - 1] = '\0';
     send_cycle(socket_fd, (char*)&data, data.data_len + 4);
+    system("clear");
+    printf("-----$ %s\n", data.buf);
     return 0;
 }

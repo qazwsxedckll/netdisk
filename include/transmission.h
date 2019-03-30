@@ -5,7 +5,7 @@
 typedef struct
 {
     int data_len;
-    char buf[1000];
+    char buf[RESULT_LEN];
 }DataPackage;
 
 int send_cycle(int, char*, int);
