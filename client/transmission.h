@@ -12,6 +12,7 @@ int send_cycle(int, char*, int);
 
 int recv_cycle(int ,char*, int);
 
-int tran_cmd(int);
+int tran_cmd(int, DataPackage*);
 
+void print_help();
 #endif

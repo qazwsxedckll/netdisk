@@ -24,11 +24,16 @@ int main(int argc, char** argv)
     }
     system("clear");
     printf("connected\n");
-    
+    print_help();
+
     DataPackage data;
     while (1)
     {
-        tran_cmd(socketFd);
+        ret = tran_cmd(socketFd, &data);
+        if (ret == 1)
+        {
+            continue;
+        }
         while (1)
         {
             recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
