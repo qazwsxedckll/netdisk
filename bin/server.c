@@ -9,13 +9,13 @@ void* transmission(void* pf)
     return NULL;
 }
 
-void factory_init(pFactory_t pf, const Config* configs, int n)
+void factory_init(pFactory_t pf, const Config* configs, int config_count)
 {
     char thread_num[5];
     char capacity[5];
 
-    get_conf_value(configs, n, "thread_num", thread_num);
-    get_conf_value(configs, n, "capacity", capacity);
+    get_conf_value(configs, config_count, "thread_num", thread_num);
+    get_conf_value(configs, config_count, "capacity", capacity);
     memset(pf, 0, sizeof(Factory_t));
     pf->pth_id = (pthread_t*)calloc(atoi(thread_num), sizeof(pthread_t));
     pf->thread_num = atoi(thread_num);
@@ -82,15 +82,15 @@ int que_get(pQue_t pq, pNode_t pNode)
     }
 }
 
-int tcp_init(int* socketFd, const Config* configs, int n)
+int tcp_init(int* socketFd, const Config* configs, int config_count)
 {
     char ip_address[20];
     char port[6];
-    char max_tcp_connection[5];
+    char listen_que_length[5];
 
-    get_conf_value(configs, n, "ip_address", ip_address);
-    get_conf_value(configs, n, "port", port);
-    get_conf_value(configs, n, "max_tcp_connection", max_tcp_connection);
+    get_conf_value(configs, config_count, "ip_address", ip_address);
+    get_conf_value(configs, config_count, "port", port);
+    get_conf_value(configs, config_count, "listen_que_length", listen_que_length);
 #ifdef _DEBUG
     printf("ip_adress: %s, port: %s\n", ip_address, port);
 #endif
@@ -110,9 +110,26 @@ int tcp_init(int* socketFd, const Config* configs, int n)
 #endif
         return -1;
     }
-    listen(*socketFd, atoi(max_tcp_connection));
+    listen(*socketFd, atoi(listen_que_length));
 #ifdef _DEBUG
     printf("tcp initialized\n");
 #endif
+    return 0;
+}
+
+int epoll_init(int* epfd, struct epoll_event** evs, int socketFd, const Config* configs, int config_count)
+{
+    char thread_num[5];
+    char max_client[5];
+
+    get_conf_value(configs, config_count, "thread_num", thread_num);
+    get_conf_value(configs, config_count, "max_client", max_client);
+
+    *epfd = epoll_create(1);
+    struct epoll_event event;
+    *evs = (struct epoll_event*)calloc(1 + atoi(max_client), sizeof(struct epoll_event));
+    event.events = EPOLLIN;
+    event.data.fd = socketFd;
+    epoll_ctl(*epfd, EPOLL_CTL_ADD, socketFd, &event);
     return 0;
 }
