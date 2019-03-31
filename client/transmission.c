@@ -33,6 +33,7 @@ void print_help()
     printf("----------welcome to Evilolipop Netdisk----------\n\n");
     printf("Usage:\n\n");
     printf("list file: ls [absolute path]\n");
+    printf("print working directory: pwd\n");
     printf("this page: --help\n");
 }
 

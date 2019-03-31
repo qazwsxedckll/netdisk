@@ -1,13 +1,13 @@
 #include "../include/cmd.h"
 
-int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, int dir_id)
+int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char* dir_id)
 {
     int i;
     MYSQL_RES* res;
     MYSQL_ROW row;
     if (path == NULL)   //only ls
     {
-        res = sql_select_by_dirid(conn, dir_id);
+        res = sql_select(conn, "dir_id", dir_id);
         if (res == NULL)
         {
             return -1;
@@ -15,7 +15,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, int dir_id
     }
     else    //ls [absolute path]
     {
-        res = sql_select_by_path(conn, path);
+        res = sql_select(conn,"file_path", path);
         if (res == NULL)
         {
             return -1;
@@ -25,7 +25,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, int dir_id
         if (atoi(row[2]) == 0)  //is dir
         {
             mysql_free_result(res);
-            res = sql_select_by_dirid(conn, atoi(row[0]));
+            res = sql_select(conn, "dir_id", row[0]);
         }
         else    //is file
         {
@@ -57,11 +57,11 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, int dir_id
     return 1;
 }
 
-int resolve_pwd(char*** result, int *n, MYSQL* conn, int dir_id)
+int resolve_pwd(char*** result, int *n, MYSQL* conn, const char* dir_id)
 {
     MYSQL_RES* res;
     MYSQL_ROW row;
-    res = sql_select_by_id(conn, dir_id);
+    res = sql_select(conn, "id",  dir_id);
     row = mysql_fetch_row(res);
     *n = 1;
     *result = (char**)malloc(sizeof(char*));
@@ -74,7 +74,7 @@ int resolve_pwd(char*** result, int *n, MYSQL* conn, int dir_id)
 /*return:
  *  1 for normal cmd
  *  -1 for ls error*/
-int cmd_interpret(char*** result, int *n,  const char* cmd, MYSQL* conn, int dir_id)
+int cmd_interpret(char*** result, int *n,  const char* cmd, MYSQL* conn, const char* dir_id)
 {
     int i = 0, j, k;
     char prefix[10];

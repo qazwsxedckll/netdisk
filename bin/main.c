@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     while (1)
     {
         new_fd = accept(socketFd, NULL, NULL);
-        int dir_id = 5; //root dir_id = 5 
+        char dir_id[] = "5";
         while(1)
         {
             recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));

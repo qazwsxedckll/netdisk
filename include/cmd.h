@@ -3,7 +3,7 @@
 #include "head.h"
 #include "sql.h"
 
-int cmd_interpret(char*** result, int* n, const char* cmd, MYSQL* conn, int dir_id);
+int cmd_interpret(char*** result, int* n, const char* cmd, MYSQL* conn, const char* dir_id);
 
 #endif
 

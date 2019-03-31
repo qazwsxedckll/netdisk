@@ -21,6 +21,7 @@
 #include <sys/epoll.h>
 
 #define _DEBUG
+#define CMD_LEN 1000
 
 #endif
 

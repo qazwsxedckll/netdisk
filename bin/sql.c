@@ -28,57 +28,26 @@ int sql_connect(MYSQL** conn)
     }
 }
 
-MYSQL_RES* sql_select_by_dirid(MYSQL* conn, int dir_id)
+MYSQL_RES* sql_select(MYSQL* conn, const char* field, const char* condition)
 {
     MYSQL_RES* res = NULL;
     char query[QUERY_LEN];
-    sprintf(query, "SELECT * FROM file WHERE dir_id = %d", dir_id);
-#ifdef _DEBUG
-    printf("sql: %s\n", query);
-#endif
-    int t = mysql_query(conn, query);
-    if (t)
+    if (strcmp(field, "file_path") == 0)
     {
-#ifdef _DEBUG
-        printf("Error making query:%s\n", mysql_error(conn));
-#endif
-        return NULL;
+        sprintf(query, "SELECT * FROM file WHERE file_path = '%s'", condition);
+    }
+    else if (strcmp(field, "dir_id") == 0)
+    {
+        sprintf(query, "SELECT * FROM file WHERE dir_id = '%s'", condition);
+    }
+    else if (strcmp(field, "id") == 0)
+    {
+        sprintf(query, "SELECT * FROM file WHERE id = '%s'", condition);
     }
     else
     {
-        res = mysql_store_result(conn);
-        return res;
-    }
-}
-
-MYSQL_RES* sql_select_by_id(MYSQL* conn, int id)
-{
-    MYSQL_RES* res = NULL;
-    char query[QUERY_LEN];
-    sprintf(query, "SELECT * FROM file WHERE id = %d", id);
-#ifdef _DEBUG
-    printf("sql: %s\n", query);
-#endif
-    int t = mysql_query(conn, query);
-    if (t)
-    {
-#ifdef _DEBUG
-        printf("Error making query:%s\n", mysql_error(conn));
-#endif
         return NULL;
     }
-    else
-    {
-        res = mysql_store_result(conn);
-        return res;
-    }
-}
-
-MYSQL_RES* sql_select_by_path(MYSQL* conn, const char* file_path)
-{
-    MYSQL_RES* res = NULL;
-    char query[QUERY_LEN];
-    sprintf(query, "SELECT * FROM file WHERE file_path = '%s'", file_path);
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif
