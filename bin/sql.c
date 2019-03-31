@@ -32,22 +32,7 @@ MYSQL_RES* sql_select(MYSQL* conn, const char* field, const char* condition)
 {
     MYSQL_RES* res = NULL;
     char query[QUERY_LEN];
-    if (strcmp(field, "file_path") == 0)
-    {
-        sprintf(query, "SELECT * FROM file WHERE file_path = '%s'", condition);
-    }
-    else if (strcmp(field, "dir_id") == 0)
-    {
-        sprintf(query, "SELECT * FROM file WHERE dir_id = '%s'", condition);
-    }
-    else if (strcmp(field, "id") == 0)
-    {
-        sprintf(query, "SELECT * FROM file WHERE id = '%s'", condition);
-    }
-    else
-    {
-        return NULL;
-    }
+    sprintf(query, "SELECT * FROM file WHERE %s = '%s'", field, condition);
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif
