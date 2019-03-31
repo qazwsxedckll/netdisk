@@ -1,8 +1,9 @@
 #include "../include/cmd.h"
 
-int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char* cur_dir_id)
+int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char* cur_dir_id, const char* root_id)
 {
     int i;
+    char abs_path[RESULT_LEN];
     MYSQL_RES* res;
     MYSQL_ROW row;
     if (path == NULL)   //only ls
@@ -10,12 +11,35 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
         res = sql_select(conn, "dir_id", cur_dir_id);
         if (res == NULL)
         {
-            return -1;
+            *n = 0;
+            return 1;
         }
     }
-    else    //ls [absolute path]
+    else        //ls [FILE]
     {
-        res = sql_select(conn,"file_path", path);
+        if (path[0] == '/')         //start with user root dir
+        {
+            res = sql_select(conn, "id", root_id);
+            row = mysql_fetch_row(res);
+            mysql_free_result(res);
+            if (strcmp(path, "/") == 0)
+            {
+                strcpy(abs_path, row[5]);
+            }
+            else
+            {
+                strcpy(abs_path, row[5]);
+                strcat(abs_path, path);
+            }
+        }
+        else        //start with cur dir
+        {
+            res = sql_select(conn, "id", cur_dir_id);
+            row = mysql_fetch_row(res);
+            mysql_free_result(res);
+            sprintf(abs_path, "%s/%s", row[5], path);
+        }
+        res = sql_select(conn,"file_path", abs_path);
         if (res == NULL)
         {
             return -1;
@@ -37,6 +61,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
             return 1;
         }
     }
+
     *n = mysql_num_rows(res);
     *result = (char**)malloc(*n * sizeof(char*));
     for (i = 0; i < *n; i++)
@@ -191,7 +216,7 @@ int cmd_interpret(char*** result, int *n, MYSQL* conn, const char* cmd, char* cu
     //only support current dir and absolute path;
     if (strcmp(prefix, "ls") == 0)
     {
-        ret = resolve_ls(result, n, path, conn, cur_dir_id);
+        ret = resolve_ls(result, n, path, conn, cur_dir_id, root_id);
         return ret;
     }
     else if (strcmp(prefix, "pwd") == 0)
