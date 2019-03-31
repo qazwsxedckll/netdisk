@@ -30,7 +30,7 @@ int main(int argc, char** argv)
     while (1)
     {
         ret = tran_cmd(socketFd, &data);
-        if (ret == 1)
+        if (ret == 1 || ret == -1)
         {
             continue;
         }
