@@ -213,7 +213,7 @@ int cmd_interpret(char*** result, int *n, MYSQL* conn, const char* cmd, char* cu
 #endif
 
     int ret;
-    //only support current dir and absolute path;
+
     if (strcmp(prefix, "ls") == 0)
     {
         ret = resolve_ls(result, n, path, conn, cur_dir_id, root_id);

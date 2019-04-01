@@ -63,7 +63,9 @@ int main(int argc, char** argv)
 
     int res_lines, i, j, ready_fd_num, cur_client_num = 0;
     DataPackage data;
+    data.data_len = 0;
     char** result;
+    char user_name[USER_NAME_LEN + 1];
     while (1)
     {
         ready_fd_num = epoll_wait(epfd, evs, 1 + max_client, -1);
@@ -77,6 +79,34 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                     printf("incoming connection\n");
 #endif
+                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));
+                    recv_cycle(new_fd, data.buf, data.data_len);
+                    strcpy(user_name, data.buf);
+                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));
+                    recv_cycle(new_fd, data.buf, data.data_len);
+#ifdef _DEBUG
+                    printf("username: %s\n", user_name);
+                    printf("password: %s\n", data.buf);
+#endif
+                    /* ret = user_verify(); */
+                    ret = 0;
+                    if (ret == -1)
+                    {
+#ifdef _DEBUG
+                        printf("verifivation failed\n");
+#endif
+                        data.data_len = -1;
+                        send_cycle(new_fd, (char*)&data, sizeof(int));
+                        continue;
+                    }
+                    else
+                    {
+#ifdef _DEBUG
+                        printf("verifivation success\n");
+#endif
+                        data.data_len = 0;
+                        send_cycle(new_fd, (char*)&data, sizeof(int));
+                    }
 
                     for (j = 0; j < max_client; j++)
                     {
@@ -86,8 +116,10 @@ int main(int argc, char** argv)
                             break;
                         }
                     }
+                    //sql root dir by user_name
                     strcpy(users[j].root_id, "9");
                     strcpy(users[j].cur_dir_id, "9");
+                    strcpy(users[j].user_name, user_name);
                     event.data.fd = users[j].fd;
                     epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
                     cur_client_num++;

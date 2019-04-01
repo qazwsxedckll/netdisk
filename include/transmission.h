@@ -8,8 +8,7 @@ typedef struct
     char buf[RESULT_LEN];
 }DataPackage;
 
-int send_cycle(int, char*, int);
+int send_cycle(int fd, char* data, int send_len);
 
-int recv_cycle(int ,char*, int);
-
+int recv_cycle(int fd, char* data, int recv_len);
 #endif

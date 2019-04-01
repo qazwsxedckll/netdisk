@@ -1,6 +1,6 @@
 #include "transmission.h"
 
-int send_cycle(int fd, char *data, int send_len)
+int send_cycle(int fd, char* data, int send_len)
 {
     int total = 0;
     int ret;
@@ -36,6 +36,81 @@ void print_help()
     printf("print working directory: pwd\n");
     printf("change directory: cd [path]\n");
     printf("this page: --help\n");
+}
+
+int tran_authen(int socketFd, char* user_name, DataPackage* data, int err)
+{
+    int ret;
+    int flag, err_flag = 0;
+    do
+    {
+        flag = 0;
+        system("clear");
+        if (err == -1)
+        {
+            printf("wrong username or password\n");
+        }
+        if (err_flag == 1)
+        {
+            printf("username too long!\n");
+            err_flag = 0;
+        }
+        printf("Enter username: ");
+        fflush(stdout);
+        while (1)
+        {
+            ret = read(STDIN_FILENO, user_name, USER_LEN);
+            if (ret >= 20)
+            {
+                flag = 1;
+                err_flag = 1;       //too long err
+            }
+            else
+            {
+                break;
+            }
+        }
+    } while (flag == 1);
+    user_name[ret - 1] = '\0';
+
+    char* password;
+    err_flag = 0;
+    while (1)
+    {
+        if (err_flag == 1)
+        {
+            system("clear");
+            printf("Enter username: %s\n", user_name);
+            printf("password too long!\n");
+            err_flag = 0;
+        }
+        password = getpass("Enter password: ");
+        if (strlen(password) > 20)
+        {
+            err_flag = 1;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    data->data_len = strlen(user_name) + 1;
+    strcpy(data->buf, user_name);
+    send_cycle(socketFd, (char*)data, data->data_len + sizeof(int));
+    data->data_len = strlen(password) + 1;
+    strcpy(data->buf, password);
+    send_cycle(socketFd, (char*)data, data->data_len + sizeof(int));
+
+    recv_cycle(socketFd, (char*)&data->data_len, sizeof(int));
+    if (data->data_len == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 int tran_cmd(int socket_fd, DataPackage* data)

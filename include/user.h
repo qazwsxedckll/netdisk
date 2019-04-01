@@ -3,6 +3,7 @@
 #include "head.h"
 
 #define USER_NAME_LEN 20
+#define USER_PWD_LEN 20
 
 typedef struct
 {
@@ -11,5 +12,7 @@ typedef struct
     char cur_dir_id[RESULT_LEN];
     char root_id[RESULT_LEN];
 }User, *Users;
+
+int user_verify();
 
 #endif
