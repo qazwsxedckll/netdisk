@@ -75,8 +75,9 @@ int main(int argc, char** argv)
                 {
                     new_fd = accept(socketFd, NULL, NULL);
 #ifdef _DEBUG
-                    printf("client connected\n");
+                    printf("incoming connection\n");
 #endif
+
                     for (j = 0; j < max_client; j++)
                     {
                         if (users[j].fd == 0)
@@ -100,7 +101,7 @@ int main(int argc, char** argv)
                     continue;
                 }
             }
-            
+
             for (j = 0; j < max_client; j++)        //command coming in
             {
                 if (evs[i].data.fd == users[j].fd)

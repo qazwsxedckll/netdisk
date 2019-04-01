@@ -30,40 +30,92 @@ int main(int argc, char** argv)
 
     //user authentication
     int flag;
-    int flag2 = 0;
-    do
+    int err_flag = 0;
+    while (1)
     {
-        flag = 0;
-        system("clear");
-        if (flag2 == 1)
+        do
         {
-            PRINT_FONT_RED
-            printf("user name too long!\n");
-            PRINT_FONT_WHI;
-        }
-        printf("Enter user_name: ");
-        fflush(stdout);
-        while (1)
+            flag = 0;
+            system("clear");
+            if (err_flag == 1)
+            {
+                PRINT_FONT_RED;
+                printf("user name too long!\n");
+                PRINT_FONT_WHI;
+                err_flag = 0;
+            }
+            if (err_flag == 2)
+            {
+                PRINT_FONT_RED;
+                printf("username do not exist\n");
+                PRINT_FONT_WHI;
+                err_flag =0;
+            }
+            printf("Enter username: ");
+            fflush(stdout);
+            while (1)
+            {
+                ret = read(STDIN_FILENO, user_name, sizeof(user_name));
+                if (ret >= 20)
+                {
+                    flag = 1;
+                    err_flag = 1;       //too long err
+                }
+                else
+                {
+                    break;
+                }
+            }
+        } while (flag == 1);
+        user_name[ret - 1] = '\0';
+        data.data_len = strlen(user_name) + 1;
+        strcpy(data.buf, user_name);
+        send_cycle(socketFd, (char*)&data, data.data_len + 4);
+        recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+        if (data.data_len == 0)
         {
-            ret = read(STDIN_FILENO, user_name, sizeof(user_name));
-            if (ret >= 20)
-            {
-                flag = 1;
-                flag2 = 1;
-            }
-            else
-            {
-                break;
-            }
+            break;
         }
-    } while (flag == 1);
-    user_name[ret - 1] = '\0';
-    password = getpass("Enter password: ");
-    puts(user_name);
+        else
+        {
+            err_flag = 2;       //wrong username err
+        }
+    }
 
+    flag = 0;
+    while (1)
+    {
+        if (flag == 1)
+        {
+            system("clear");
+            printf("Enter username: %s\n", user_name);
+            if (err_flag == 2)
+            {
+                PRINT_FONT_RED;
+                printf("wrong password\n");
+                PRINT_FONT_WHI;
+                err_flag =0;
+            }
+        }
+        password = getpass("Enter password: ");
+        data.data_len = strlen(password) + 1;
+        strcpy(data.buf, password);
+        send_cycle(socketFd, (char*)&data, data.data_len + 4);
+        recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+        if (data.data_len == 0)
+        {
+            break;
+        }
+        else
+        {
+            flag = 1;
+            err_flag = 2;
+        }
+    }
+
+    system("clear");
     print_help();
 
-    return 0;
     while (1)
     {
         ret = tran_cmd(socketFd, &data);
