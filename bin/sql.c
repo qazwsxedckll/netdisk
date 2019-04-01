@@ -28,11 +28,11 @@ int sql_connect(MYSQL** conn)
     }
 }
 
-MYSQL_RES* sql_select(MYSQL* conn, const char* field, const char* condition)
+MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const char* condition)
 {
     MYSQL_RES* res = NULL;
     char query[QUERY_LEN];
-    sprintf(query, "SELECT * FROM file WHERE %s = '%s'", field, condition);
+    sprintf(query, "SELECT * FROM %s WHERE %s = '%s'", table, field, condition);
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif

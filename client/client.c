@@ -20,18 +20,12 @@ int main(int argc, char** argv)
     serAddr.sin_family = AF_INET;
     serAddr.sin_addr.s_addr = inet_addr(argv[1]);
     serAddr.sin_port = htons(atoi(argv[2]));
-    ret = connect(socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
-    if (ret == -1)
-    {
-        printf("connect failed\n");
-        return -1;
-    }
 
     //user authentication
     ret = 0;
     while (1)
     {
-        ret = tran_authen(socketFd, user_name, &data, ret);
+        ret = tran_authen(&socketFd, argv[1], argv[2], user_name, &data, ret);
         if (ret == 0)
         {
             break;

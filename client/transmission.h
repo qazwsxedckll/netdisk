@@ -14,7 +14,7 @@ int recv_cycle(int fd, char* data, int recv_len);
 
 int tran_cmd(int fd, DataPackage* data);
 
-int tran_authen(int socketFd, char* user_name, DataPackage* data, int err);
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err);
 
 void print_help();
 #endif

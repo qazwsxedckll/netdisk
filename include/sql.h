@@ -6,5 +6,6 @@
 
 int sql_connect(MYSQL** conn);
 
-MYSQL_RES* sql_select(MYSQL* conn, const char* field, const char* condition);
+MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const char* condition);
+
 #endif

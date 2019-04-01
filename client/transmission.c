@@ -38,7 +38,7 @@ void print_help()
     printf("this page: --help\n");
 }
 
-int tran_authen(int socketFd, char* user_name, DataPackage* data, int err)
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err)
 {
     int ret;
     int flag, err_flag = 0;
@@ -97,12 +97,24 @@ int tran_authen(int socketFd, char* user_name, DataPackage* data, int err)
 
     data->data_len = strlen(user_name) + 1;
     strcpy(data->buf, user_name);
-    send_cycle(socketFd, (char*)data, data->data_len + sizeof(int));
+
+    *socketFd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_addr.s_addr = inet_addr(ip);
+    serAddr.sin_port = htons(atoi(port));
+    ret = connect(*socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
+    if (ret == -1)
+    {
+        printf("connect failed\n");
+        return -1;
+    }
+    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
     data->data_len = strlen(password) + 1;
     strcpy(data->buf, password);
-    send_cycle(socketFd, (char*)data, data->data_len + sizeof(int));
+    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
 
-    recv_cycle(socketFd, (char*)&data->data_len, sizeof(int));
+    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
     if (data->data_len == 0)
     {
         return 0;

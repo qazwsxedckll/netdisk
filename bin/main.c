@@ -68,6 +68,7 @@ int main(int argc, char** argv)
     char user_name[USER_NAME_LEN + 1];
     while (1)
     {
+        printf("before wait\n");
         ready_fd_num = epoll_wait(epfd, evs, 1 + max_client, -1);
         for (i = 0; i < ready_fd_num; i++)
         {
@@ -88,8 +89,7 @@ int main(int argc, char** argv)
                     printf("username: %s\n", user_name);
                     printf("password: %s\n", data.buf);
 #endif
-                    /* ret = user_verify(); */
-                    ret = 0;
+                    ret = user_verify(conn, user_name, data.buf);
                     if (ret == -1)
                     {
 #ifdef _DEBUG
@@ -97,6 +97,7 @@ int main(int argc, char** argv)
 #endif
                         data.data_len = -1;
                         send_cycle(new_fd, (char*)&data, sizeof(int));
+                        close(new_fd);
                         continue;
                     }
                     else
@@ -117,9 +118,12 @@ int main(int argc, char** argv)
                         }
                     }
                     //sql root dir by user_name
-                    strcpy(users[j].root_id, "9");
-                    strcpy(users[j].cur_dir_id, "9");
+                    char* root_dir = user_find_root(conn, user_name);
+                    strcpy(users[j].root_id, root_dir);
+                    strcpy(users[j].cur_dir_id, root_dir);
                     strcpy(users[j].user_name, user_name);
+                    free(root_dir);
+                    root_dir = NULL;
                     event.data.fd = users[j].fd;
                     epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
                     cur_client_num++;
