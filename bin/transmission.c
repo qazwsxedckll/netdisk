@@ -23,6 +23,10 @@ int recv_cycle(int fd, char* data, int recv_len)
     while (total < recv_len)
     {
         ret = recv(fd, data + total, recv_len - total, 0);
+        if (ret == 0)
+        {
+            return -1;
+        }
         total = total + ret;
     }
     return 0;

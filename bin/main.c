@@ -138,7 +138,16 @@ int main(int argc, char** argv)
             {
                 if (evs[i].data.fd == users[j].fd)
                 {
-                    recv_cycle(users[j].fd, (char*)&data.data_len, sizeof(int));
+                    ret = recv_cycle(users[j].fd, (char*)&data.data_len, sizeof(int));
+                    if (ret == -1)
+                    {
+#ifdef _DEBUG
+                        printf("client disconnected\n");
+#endif
+                        epoll_ctl(epfd, EPOLL_CTL_DEL, users[j].fd, &event);
+                        cur_client_num--;
+                        break;
+                    }
                     recv_cycle(users[j].fd, data.buf, data.data_len);
 #ifdef _DEBUG
                     printf("received form client: %s\n", data.buf);
