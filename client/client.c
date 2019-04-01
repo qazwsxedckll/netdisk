@@ -11,6 +11,11 @@ int main(int argc, char** argv)
 
     int ret;
 
+    DataPackage data;
+    char user_name[USER_LEN]; 
+    char *password;
+
+    //connect to server
     int socketFd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
@@ -22,11 +27,43 @@ int main(int argc, char** argv)
         printf("connect failed\n");
         return -1;
     }
-    system("clear");
-    printf("connected\n");
+
+    //user authentication
+    int flag;
+    int flag2 = 0;
+    do
+    {
+        flag = 0;
+        system("clear");
+        if (flag2 == 1)
+        {
+            PRINT_FONT_RED
+            printf("user name too long!\n");
+            PRINT_FONT_WHI;
+        }
+        printf("Enter user_name: ");
+        fflush(stdout);
+        while (1)
+        {
+            ret = read(STDIN_FILENO, user_name, sizeof(user_name));
+            if (ret >= 20)
+            {
+                flag = 1;
+                flag2 = 1;
+            }
+            else
+            {
+                break;
+            }
+        }
+    } while (flag == 1);
+    user_name[ret - 1] = '\0';
+    password = getpass("Enter password: ");
+    puts(user_name);
+
     print_help();
 
-    DataPackage data;
+    return 0;
     while (1)
     {
         ret = tran_cmd(socketFd, &data);

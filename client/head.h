@@ -22,6 +22,12 @@
 
 #define _DEBUG
 #define CMD_LEN 1000
+#define USER_LEN 20
+
+/*设置输出前景色*/
+#define PRINT_FONT_RED  printf("\033[31m"); //红色
+#define PRINT_FONT_CYA  printf("\033[36m"); //青色
+#define PRINT_FONT_WHI  printf("\033[37m"); //白色
 
 #endif
 
