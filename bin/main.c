@@ -127,6 +127,9 @@ int main(int argc, char** argv)
                     event.data.fd = users[j].fd;
                     epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
                     cur_client_num++;
+#ifdef _DEBUG
+                    printf("cur_client_num: %d\n", cur_client_num);
+#endif
                     continue;
                 }
                 else

@@ -5,9 +5,8 @@ int user_verify(MYSQL* conn, const char* user_name, const char* password)
     MYSQL_RES* res;
     MYSQL_ROW row;
     res = sql_select(conn, "user", "user_name", user_name);
-    if (mysql_num_rows(res) == 0)
+    if (res == NULL)
     {
-        mysql_free_result(res);
         return -1;
     }
     mysql_free_result(res);

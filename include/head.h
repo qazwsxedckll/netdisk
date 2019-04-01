@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <sys/epoll.h>
 #include <mysql/mysql.h>
+#include <assert.h>
 
 #define _DEBUG
 #define RESULT_LEN 1000

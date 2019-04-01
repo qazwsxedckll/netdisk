@@ -98,6 +98,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
     data->data_len = strlen(user_name) + 1;
     strcpy(data->buf, user_name);
 
+    //connect to server
     *socketFd = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in serAddr;
     serAddr.sin_family = AF_INET;
@@ -121,6 +122,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
     }
     else
     {
+        close(*socketFd);
         return -1;
     }
 }

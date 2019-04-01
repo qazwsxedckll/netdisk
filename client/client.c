@@ -14,12 +14,7 @@ int main(int argc, char** argv)
     DataPackage data;
     char user_name[USER_LEN + 1];
 
-    //connect to server
-    int socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_addr.s_addr = inet_addr(argv[1]);
-    serAddr.sin_port = htons(atoi(argv[2]));
+    int socketFd;
 
     //user authentication
     ret = 0;
