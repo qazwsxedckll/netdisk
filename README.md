@@ -6,7 +6,7 @@
 
 /bin
 
-gcc *.c -I /usr/include/mysql/ -lmysqlclient -lpthread
+make
 
 执行
 
