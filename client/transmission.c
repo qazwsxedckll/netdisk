@@ -1,6 +1,6 @@
 #include "transmission.h"
 
-int send_cycle(int fd, char* data, int send_len)
+int send_cycle(int fd, const char* data, int send_len)
 {
     int total = 0;
     int ret;
@@ -38,6 +38,23 @@ void print_help()
     printf("this page: --help\n");
 }
 
+int connect_server(int* socketFd, const char* ip, const char* port)
+{
+    int ret;
+    *socketFd = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serAddr;
+    serAddr.sin_family = AF_INET;
+    serAddr.sin_addr.s_addr = inet_addr(ip);
+    serAddr.sin_port = htons(atoi(port));
+    ret = connect(*socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
+    if (ret == -1)
+    {
+        printf("connect failed\n");
+        return -1;
+    }
+    return 0;
+}
+
 int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err)
 {
     int ret;
@@ -49,6 +66,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         if (err == -1)
         {
             printf("wrong username or password\n");
+            err = 0;
         }
         if (err_flag == 1)
         {
@@ -95,44 +113,36 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         }
     }
 
-    data->data_len = strlen(user_name) + 1;
-    strcpy(data->buf, user_name);
-
     //connect to server
-    *socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_addr.s_addr = inet_addr(ip);
-    serAddr.sin_port = htons(atoi(port));
-    ret = connect(*socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
+    ret = connect_server(socketFd, ip, port);
     if (ret == -1)
     {
-        printf("connect failed\n");
         return -1;
     }
-    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
+    data->data_len = 0;
+    send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
+    data->data_len = strlen(user_name) + 1;
+    strcpy(data->buf, user_name);
+    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send username
     data->data_len = strlen(password) + 1;
     strcpy(data->buf, password);
-    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
+    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
 
-    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
-    if (data->data_len == 0)
-    {
-        return 0;
-    }
-    else
+    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
+    recv_cycle(*socketFd, data->buf, data->data_len);
+    if (data->data_len == -1)
     {
         close(*socketFd);
         return -1;
     }
+    else
+    {
+        return 0;
+    }
 }
 
-int tran_cmd(int socket_fd, DataPackage* data)
+int cmd_interpret(const DataPackage* data)
 {
-    data->data_len = read(STDIN_FILENO, data->buf, sizeof(data->buf));
-    data->buf[data->data_len - 1] = '\0';
-
-    //verify cmd
     if (strcmp(data->buf, "--help") == 0)
     {
         system("clear");
@@ -150,18 +160,14 @@ int tran_cmd(int socket_fd, DataPackage* data)
             {
                 strncpy(prefix, data->buf, i);
                 prefix[i] = '\0';
-                if (strcmp(prefix, "ls"))
-                    if (strcmp(prefix, "cd"))
-                        if (strcmp(prefix, "puts"))
-                            if (strcmp(prefix, "gets"))
-                                if (strcmp(prefix, "remove"))
-                                    if (strcmp(prefix, "pwd"))
-                                    {
-                                        system("clear");
-                                        printf("-----$ %s\n", data->buf);
-                                        printf("invaild command\n");
-                                        return -1;
-                                    }
+                if (strcmp(prefix, "ls") && strcmp(prefix, "cd") && strcmp(prefix, "pwd")
+                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "remove"))
+                {
+                    system("clear");
+                    printf("-----$ %s\n", data->buf);
+                    printf("invaild command\n");
+                    return -1;
+                }
             }
             if (data->buf[i] == ' ')
             {
@@ -180,11 +186,109 @@ int tran_cmd(int socket_fd, DataPackage* data)
             }
             i++;
         }
-    }
 
+        if (strcmp(prefix, "gets") == 0)
+        {
+            system("clear");
+            printf("-----$ %s\n", data->buf);
+            return 2;
+        }
+        return 0;
+    }
+}
+
+int tran_cmd(int socket_fd, DataPackage* data)
+{
     send_cycle(socket_fd, (char*)data, data->data_len + 4);
     system("clear");
     printf("-----$ %s\n", data->buf);
+    while (1)
+    {
+        recv_cycle(socket_fd, (char*)&data->data_len, sizeof(int));
+        if (data->data_len == 0)
+        {
+            break;
+        }
+        recv_cycle(socket_fd, data->buf, data->data_len);
+        printf("%s\n", data->buf);
+    }
     return 0;
 }
 
+void* get_files(void* p)
+{
+    int ret, socketFd;
+    DataPackage data;
+    GetsInfo* gets_info = (GetsInfo*)p;
+    ret = connect_server(&socketFd, gets_info->ip_address, gets_info->port);
+    if (ret == -1)
+    {
+        pthread_exit(NULL);
+    }
+    data.data_len = 1;
+    send_cycle(socketFd, (char*)&data, sizeof(int));        //1 for gets
+    data.data_len = strlen(gets_info->token) + 1;
+    strcpy(data.buf, gets_info->token);
+    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send token
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+    if (data.data_len == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    data.data_len = strlen(gets_info->cmd) + 1;
+    strcpy(data.buf, gets_info->cmd);
+    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send command
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+    if (data.data_len == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
+    recv_cycle(socketFd, data.buf, data.data_len);
+    int fd = open(data.buf, O_CREAT|O_RDWR, 0666);
+    if (fd == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv size
+    recv_cycle(socketFd, data.buf, data.data_len);
+    off_t size = atoi(data.buf);
+
+    int transfered = 0;
+    time_t start, end;
+    start = time(NULL);
+    printf("\r%4.1f%%", (float)transfered / size *100);
+    fflush(stdout);
+    while (1)
+    {
+        recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+        printf("len %d\n", data.data_len);
+        if (data.data_len > 0)
+        {
+            recv_cycle(socketFd, data.buf, data.data_len);
+            write(fd, data.buf, data.data_len);
+            transfered += data.data_len;
+            end = time(NULL);
+            if (end - start >= 1)
+            {
+                printf("\r%4.1f%%", (float)transfered / size *100);
+                start = end;
+                fflush(stdout);
+            }
+        }
+        else
+        {
+            printf("\r%4.1f%%", (float)transfered / size *100);
+            close(fd);
+            break;
+        }
+    }
+    close(socketFd);
+    pthread_exit(NULL);
+}

@@ -24,6 +24,10 @@
 
 #define _DEBUG
 #define RESULT_LEN 1000
+#define INT_LEN 12
+#define TOKEN_LEN 30
+#define MD5_LEN 150
+#define FILE_NAME_LEN 100
 
 #endif
 

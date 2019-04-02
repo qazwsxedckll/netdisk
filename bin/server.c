@@ -1,11 +1,29 @@
 #include "../include/server.h"
 #include "../include/config.h"
+#include "../include/transmission.h"
 
 void* transmission(void* pf)
 {
     pFactory_t p = (pFactory_t)pf;
-    printf("start\n");
-    pthread_cond_wait(&p->cond, &p->que.mutex);
+    pQue_t pq = &p->que;
+    pNode_t pcur;
+    int is_get;
+    while (1)
+    {
+        pthread_mutex_lock(&pq->mutex);
+        if (pq->que_size == 0)
+        {
+            pthread_cond_wait(&p->cond, &pq->mutex);
+        }
+        is_get = que_get(pq, &pcur);
+        pthread_mutex_unlock(&pq->mutex);
+        if (is_get == 0)
+        {
+            tran_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
+            free(pcur);
+            pcur = NULL;
+        }
+    }
     return NULL;
 }
 
@@ -59,7 +77,7 @@ void que_insert(pQue_t pq, pNode_t new_node)
     }
 }
 
-int que_get(pQue_t pq, pNode_t pNode)
+int que_get(pQue_t pq, pNode_t* ppNode)
 {
     if (pq->que_head == NULL)
     {
@@ -70,13 +88,13 @@ int que_get(pQue_t pq, pNode_t pNode)
     }
     else if (pq->que_head == pq->que_tail)
     {
-        pNode = pq->que_head;
+        *ppNode = pq->que_head;
         pq->que_head = pq->que_tail = NULL;
         return 0;
     }
     else
     {
-        pNode = pq->que_head;
+        *ppNode = pq->que_head;
         pq->que_head = pq->que_head->pNext;
         return 0;
     }

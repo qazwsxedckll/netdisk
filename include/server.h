@@ -6,6 +6,9 @@
 typedef struct Node_t
 {
     int new_fd;
+    char file_md5[MD5_LEN];
+    char file_name[FILE_NAME_LEN];
+    char file_size[INT_LEN];
     struct Node_t* pNext;
 }Node_t, *pNode_t;
 
@@ -34,7 +37,7 @@ void que_init(pQue_t, int);
 
 void que_insert(pQue_t, pNode_t);
 
-int que_get(pQue_t, pNode_t);
+int que_get(pQue_t, pNode_t*);
 
 int tcp_init(int*, const Config*, int);
 

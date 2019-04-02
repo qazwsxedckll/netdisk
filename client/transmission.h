@@ -8,13 +8,13 @@ typedef struct
     char buf[CMD_LEN];
 }DataPackage;
 
-int send_cycle(int fd, char* data, int send_len);
-
-int recv_cycle(int fd, char* data, int recv_len);
-
 int tran_cmd(int fd, DataPackage* data);
 
 int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err);
+
+int cmd_interpret(const DataPackage* data);
+
+void* get_files(void* p);
 
 void print_help();
 #endif

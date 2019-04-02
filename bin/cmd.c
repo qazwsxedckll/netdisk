@@ -172,7 +172,7 @@ int resolve_cd(char*** result, int *n, const char* cmd_path, MYSQL* conn, char* 
     }
 }
 
-int resolve_gets(const char* path, MYSQL* conn, const char* root_id, const char* cur_dir_id)
+int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* path, MYSQL* conn, const char* root_id, const char* cur_dir_id)
 {
     char* abs_path;
     MYSQL_RES* res;
@@ -184,7 +184,7 @@ int resolve_gets(const char* path, MYSQL* conn, const char* root_id, const char*
     abs_path = NULL;
     if (res == NULL)
     {
-        return -3;
+        return -1;
     }
 
     row = mysql_fetch_row(res);
@@ -192,11 +192,14 @@ int resolve_gets(const char* path, MYSQL* conn, const char* root_id, const char*
     if (atoi(row[2]) == 0)          //is dir
     {
         //to be complete
-        return -3;
+        return -1;
     }
     else        //is file
     {
-
+        strcpy(file_size, row[4]);
+        strcpy(file_name, row[3]);
+        strcpy(file_md5, row[0]);
+        return 1;
     }
 }
 
