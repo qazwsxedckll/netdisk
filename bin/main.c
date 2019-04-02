@@ -66,9 +66,11 @@ int main(int argc, char** argv)
     data.data_len = 0;
     char** result;
     char user_name[USER_NAME_LEN + 1];
+    //cmd
+    char prefix[10] = { 0 };
+    char cmd_path[RESULT_LEN] = { 0 };
     while (1)
     {
-        printf("before wait\n");
         ready_fd_num = epoll_wait(epfd, evs, 1 + max_client, -1);
         for (i = 0; i < ready_fd_num; i++)
         {
@@ -159,7 +161,32 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                     printf("received form client: %s\n", data.buf);
 #endif
-                    ret = cmd_interpret(&result, &res_lines, conn, data.buf, users[j].cur_dir_id, users[j].root_id);
+                    //resolve command
+                    cmd_interpret(data.buf, prefix, cmd_path);
+                    /*return:
+                     *  1 for normal cmd
+                     *  2 for cd result
+                     *  -1 for ls error
+                     *  -2 for cd error
+                     *  -3 for gets error*/
+                    if (strcmp(prefix, "ls") == 0)
+                    {
+                        ret = resolve_ls(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
+                    }
+                    else if (strcmp(prefix, "pwd") == 0)
+                    {
+                        ret = resolve_pwd(&result, &res_lines, conn, users[j].cur_dir_id);
+                    }
+                    else if(strcmp(prefix, "cd") == 0)
+                    {
+                        if (strlen(cmd_path) == 0)
+                        {
+                            ret = -2;
+                        }
+                        ret = resolve_cd(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
+                    }
+
+                    //send result to client
                     if (ret == -1)      //ls error
                     {
                         strcpy(data.buf, "ls: cannot access: No such file or directory");
