@@ -131,9 +131,9 @@ int main(int argc, char** argv)
                         if (flag == 0)
                         {
 #ifdef _DEBUG
-                            printf("token verification success\n");
+                            printf("start downloading\n");
 #endif
-                            close(new_fd);
+                            /* close(new_fd); */
                             continue;
                         }
                         if (flag == -2)

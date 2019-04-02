@@ -263,12 +263,11 @@ void* get_files(void* p)
     int transfered = 0;
     time_t start, end;
     start = time(NULL);
-    printf("\r%4.1f%%", (float)transfered / size *100);
+    printf("\r%4.1f%%", (float)transfered / size * 100);
     fflush(stdout);
     while (1)
     {
         recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
-        printf("len %d\n", data.data_len);
         if (data.data_len > 0)
         {
             recv_cycle(socketFd, data.buf, data.data_len);
@@ -277,14 +276,14 @@ void* get_files(void* p)
             end = time(NULL);
             if (end - start >= 1)
             {
-                printf("\r%4.1f%%", (float)transfered / size *100);
+                printf("\r%4.1f%%", (float)transfered / size * 100);
                 start = end;
                 fflush(stdout);
             }
         }
         else
         {
-            printf("\r%4.1f%%", (float)transfered / size *100);
+            printf("\r%4.1f%%\n", (float)transfered / size * 100);
             close(fd);
             break;
         }

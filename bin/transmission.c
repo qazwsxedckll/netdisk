@@ -46,6 +46,10 @@ int tran_file(int client_fd, char* file_name, char* file_md5, char* file_size)
     char file_path[MD5_LEN] = "../netdisk/";
     strcat(file_path, file_md5);
     int fd = open(file_path, O_RDONLY);
+    if (fd == -1)
+    {
+        return -2;
+    }
     data.data_len = strlen(file_size) + 1;
     strcpy(data.buf, file_size);
     ret = send_cycle(client_fd, (char*)&data, data.data_len + sizeof(int));        //send file size
@@ -56,6 +60,10 @@ int tran_file(int client_fd, char* file_name, char* file_md5, char* file_size)
     while ((data.data_len = read(fd, data.buf, sizeof(data.buf))) > 0)
     {
         ret = send_cycle(client_fd, (char*)&data, data.data_len + sizeof(int));
+        if (ret == -1)
+        {
+            return -1;
+        }
     }
     data.data_len = 0;
     ret =send_cycle(client_fd, (char*)&data, sizeof(int));

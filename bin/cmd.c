@@ -198,7 +198,7 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     {
         strcpy(file_size, row[4]);
         strcpy(file_name, row[3]);
-        strcpy(file_md5, row[0]);
+        strcpy(file_md5, row[6]);
         return 1;
     }
 }

@@ -4,6 +4,7 @@
 
 void* transmission(void* pf)
 {
+    int ret;
     pFactory_t p = (pFactory_t)pf;
     pQue_t pq = &p->que;
     pNode_t pcur;
@@ -19,7 +20,21 @@ void* transmission(void* pf)
         pthread_mutex_unlock(&pq->mutex);
         if (is_get == 0)
         {
-            tran_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
+            ret = tran_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
+#ifdef _DEBUG  
+            if (ret == -1)
+            {
+                printf("transmission interrupted\n");
+            }
+            if (ret == -2)
+            {
+                printf("cannot open file\n");
+            }
+            if (ret == 0)
+            {
+                printf("transmission succeed\n");
+            }
+#endif
             free(pcur);
             pcur = NULL;
         }
