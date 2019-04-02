@@ -24,7 +24,7 @@ gcc *.c
 
 执行
 
-./a.out [本地ip] [server.conf里的port] 
+./a.out [服务器ip] [服务器port] 
 
 ----------
 
