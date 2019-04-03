@@ -150,12 +150,14 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
         mysql_query(conn, query);
         return -1;
     }
+
     res = sql_select(conn, "file", "file_md5", file_md5);
     row = mysql_fetch_row(res);
     mysql_free_result(res);
     char file_id[INT_LEN];
     strcpy(file_id, row[0]);
     ret = sql_insert_userfile(conn, user_id, file_id);
+
     if (ret)
     {
         strcpy(query, "ROLLBACK");

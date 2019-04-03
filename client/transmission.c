@@ -357,7 +357,7 @@ void* put_files(void* p)
     }
     file_path[i] = '\0';
     int fd = open(file_path, O_RDONLY);
-    if (ret == -1)
+    if (fd == -1)
     {
         close(socketFd);
         pthread_exit(NULL);
@@ -397,8 +397,8 @@ void* put_files(void* p)
         pthread_exit(NULL);
     }
     off_t file_size = buf.st_size;
-    data.data_len = sizeof(file_size);
     sprintf(data.buf, "%ld", file_size);
+    data.data_len = strlen(data.buf);
     send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
     if (ret == -1)
     {

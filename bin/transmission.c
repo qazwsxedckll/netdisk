@@ -94,11 +94,8 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     {
         return -2;
     }
-#ifdef _DEBUG
-    printf("path_name: %s\n", path_name);
-#endif
 
-    recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv filename;
+    ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv filename;
     if (ret == -1)
     {
         remove(path_name);
@@ -106,7 +103,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         close(client_fd);
         return -1;
     }
-    recv_cycle(client_fd, data.buf, data.data_len);
+    ret = recv_cycle(client_fd, data.buf, data.data_len);
     if (ret == -1)
     {
         remove(path_name);
@@ -119,7 +116,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     printf("filename: %s\n", file_name);
 #endif
 
-    recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv filesize;
+    ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv filesize;
     if (ret == -1)
     {
         remove(path_name);
@@ -127,7 +124,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         close(client_fd);
         return -1;
     }
-    recv_cycle(client_fd, data.buf, data.data_len);
+    ret = recv_cycle(client_fd, data.buf, data.data_len);
     if (ret == -1)
     {
         remove(path_name);
@@ -135,7 +132,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         close(client_fd);
         return -1;
     }
-    file_size = atoi(data.buf);
+    file_size = atol(data.buf);
 #ifdef _DEBUG
     printf("filesize: %ld\n", file_size);
 #endif
@@ -143,7 +140,14 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     int transfered = 0;
     while (1)
     {
-        recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));
+        ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));
+        if (ret == -1)
+        {
+            remove(path_name);
+            close(fd);
+            close(client_fd);
+            return -1;
+        }
         if (data.data_len > 0)
         {
             recv_cycle(client_fd, data.buf, data.data_len);
@@ -152,50 +156,41 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         }
         else
         {
-            if (transfered == file_size)
-            {
-                compute_file_md5(fd, file_md5);
-                char new_pathname[RESULT_LEN] = "../netdisk/";
-                strcat(new_pathname, file_md5);
-                rename(path_name, new_pathname);
+            lseek(fd, 0, SEEK_SET);
+            compute_file_md5(fd, file_md5);
+            char new_pathname[RESULT_LEN] = "../netdisk/";
+            strcat(new_pathname, file_md5);
+            rename(path_name, new_pathname);
 
-                //databse ops
-                MYSQL* conn;
-                ret = sql_connect(&conn);
-                if (ret == -1)
-                {
-                    remove(path_name);
-                    close(fd);
-                    close(client_fd);
-                    return -1;
-                }
-                ret = sql_insert_file(conn, user_name, cur_dir_id, 1, file_name, file_size, file_md5);
-                if (ret)
-                {
-                    mysql_close(conn);
-#ifdef _DEBUG
-                    printf("database closed\n");
-#endif
-                    remove(path_name);
-                    close(fd);
-                    close(client_fd);
-                    return -1;      //insert failed
-                }
-                mysql_close(conn);
-#ifdef _DEBUG
-                    printf("database closed\n");
-#endif
-                close(fd);
-                close(client_fd);
-                return 0;
-            }
-            else
+            //databse ops
+            MYSQL* conn;
+            ret = sql_connect(&conn);
+            if (ret == -1)
             {
                 remove(path_name);
                 close(fd);
                 close(client_fd);
                 return -1;
             }
+            ret = sql_insert_file(conn, user_name, cur_dir_id, 1, file_name, file_size, file_md5);
+            if (ret)
+            {
+                mysql_close(conn);
+#ifdef _DEBUG
+                printf("database closed\n");
+#endif
+                remove(path_name);
+                close(fd);
+                close(client_fd);
+                return -1;      //insert failed
+            }
+            mysql_close(conn);
+#ifdef _DEBUG
+            printf("database closed\n");
+#endif
+            close(fd);
+            close(client_fd);
+            return 0;
         }
     }
 }
