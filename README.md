@@ -20,7 +20,7 @@ make
 
 /client
 
-gcc *.c
+gcc *.c -lpthread
 
 执行
 
