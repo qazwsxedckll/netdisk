@@ -6,6 +6,7 @@
 typedef struct Node_t
 {
     int new_fd;
+    int code;       //2 for gets 3 for puts
     char file_md5[MD5_LEN];
     char file_name[FILE_NAME_LEN];
     char file_size[INT_LEN];

@@ -20,21 +20,42 @@ void* transmission(void* pf)
         pthread_mutex_unlock(&pq->mutex);
         if (is_get == 0)
         {
-            ret = tran_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
-#ifdef _DEBUG  
-            if (ret == -1)
+            if (pcur->code == 2)
             {
-                printf("transmission interrupted\n");
-            }
-            if (ret == -2)
-            {
-                printf("cannot open file\n");
-            }
-            if (ret == 0)
-            {
-                printf("transmission succeed\n");
-            }
+                ret = send_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
+#ifdef _DEBUG
+                if (ret == -1)
+                {
+                    printf("transmission interrupted\n");
+                }
+                if (ret == -2)
+                {
+                    printf("cannot open file\n");
+                }
+                if (ret == 0)
+                {
+                    printf("transmission succeed\n");
+                }
 #endif
+            }
+            else if (pcur->code == 3)
+            {
+                ret = recv_file(pcur->new_fd, pcur->file_name, pcur->file_size);     //user_name && cur_dir_id
+#ifdef _DEBUG
+                if (ret == -1)
+                {
+                    printf("transmission interrupted\n");
+                }
+                if (ret == -2)
+                {
+                    printf("cannot open file\n");
+                }
+                if (ret == 0)
+                {
+                    printf("transmission succeed\n");
+                }
+#endif
+            }
             free(pcur);
             pcur = NULL;
         }

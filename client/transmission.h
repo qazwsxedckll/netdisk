@@ -16,5 +16,7 @@ int cmd_interpret(const DataPackage* data);
 
 void* get_files(void* p);
 
+void* put_files(void* p);
+
 void print_help();
 #endif

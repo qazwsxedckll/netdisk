@@ -13,5 +13,6 @@ int resolve_cd(char*** result, int *n, const char* cmd_path, MYSQL* conn, char* 
 
 int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* path, MYSQL* conn, const char* root_id, const char* cur_dir_id);
 
+int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const char* cur_dir_id);
 #endif
 

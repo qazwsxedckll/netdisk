@@ -177,7 +177,7 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     char* abs_path;
     MYSQL_RES* res;
     MYSQL_ROW row;
-    
+
     abs_path = convert_path(path, conn, root_id, cur_dir_id);
     res = sql_select(conn, "file", "file_path", abs_path);
     free(abs_path);
@@ -200,6 +200,43 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
         strcpy(file_name, row[3]);
         strcpy(file_md5, row[6]);
         return 1;
+    }
+}
+
+int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const char* cur_dir_id)
+{
+    MYSQL_RES* res;
+    char* abs_path;
+    char file_name[FILE_NAME_LEN];
+
+    int len = strlen(cmd_path);
+    while (cmd_path[len] != '/' && len != -1)
+    {
+        len--;
+    }
+    len++;
+    int i;
+    while (cmd_path[len] != '\0')
+    {
+        file_name[i++] = cmd_path[len++];
+    }
+    file_name[i] = '\0';
+
+    abs_path = convert_path(file_name, conn, root_id, cur_dir_id);
+    res = sql_select(conn, "file", "file_path", abs_path);
+    free(abs_path);
+    abs_path = NULL;
+    if (res == NULL)
+    {
+        return 0;
+    }
+    else
+    {
+        mysql_free_result(res);
+#ifdef _DEBUG
+        printf("insert file failed: file exist\n");
+#endif
+        return -1;          //file exist
     }
 }
 

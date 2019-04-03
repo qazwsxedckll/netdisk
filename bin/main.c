@@ -86,11 +86,11 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                     printf("incoming connection\n");
 #endif
-                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get connection code
-                    if (data.data_len == 1)
+                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get connection code 0 for login, 2 for gets, 3 for puts
+                    if (data.data_len == 2 || data.data_len == 3)
                     {
 #ifdef _DEBUG
-                        printf("connection for file getting\n");
+                        printf("connection for file transmission\n");
 #endif
 
                         recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get token
@@ -105,35 +105,90 @@ int main(int argc, char** argv)
                             {
                                 data.data_len = 0;
                                 send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verified
-                                flag = 0;
+                                flag = 1;                                           //token verified
                                 recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));     //recv command
                                 recv_cycle(new_fd, data.buf, data.data_len);
                                 cmd_interpret(data.buf, prefix, cmd_path);
                                 pNode_t pnew = (pNode_t)calloc(1, sizeof(Node_t));
-                                ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
-                                if (ret == -1)
+                                if (strcmp(prefix, "gets") == 0)
                                 {
-                                    free(pnew);
-                                    pnew = NULL;
-                                    flag = -2;
+                                    flag = 2;
+                                    ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
+                                    if (ret == -1)
+                                    {
+                                        free(pnew);
+                                        pnew = NULL;
+                                        flag = -2;
+                                        break;
+                                    }
+                                    pnew->new_fd = new_fd;
+                                    pnew->code = 2;
+                                    data.data_len = 0;
+                                    send_cycle(new_fd, (char*)&data, sizeof(int));      //send file exist
+                                    pthread_mutex_lock(&f.que.mutex);
+                                    que_insert(&f.que, pnew);
+                                    pthread_mutex_unlock(&f.que.mutex);
+                                    pthread_cond_signal(&f.cond);
                                     break;
                                 }
-                                pnew->new_fd = new_fd;
-                                data.data_len = 0;
-                                send_cycle(new_fd, (char*)&data, sizeof(int));      //send file exist
-                                pthread_mutex_lock(&f.que.mutex);
-                                que_insert(&f.que, pnew);
-                                pthread_mutex_unlock(&f.que.mutex);
-                                pthread_cond_signal(&f.cond);
-                                break;
+                                else if (strcmp(prefix, "puts") == 0)
+                                {
+                                    flag = 3;
+                                    ret = resolve_puts(cmd_path, conn, users[j].root_id, users[j].cur_dir_id);
+                                    if (ret == -1)
+                                    {
+                                        free(pnew);
+                                        pnew = NULL;
+                                        flag = -3;
+                                        break;
+                                    }
+                                    pnew->new_fd = new_fd;
+                                    pnew->code = 3;
+                                    strcpy(pnew->file_name, users[j].user_name);    //send username via file_name
+                                    strcpy(pnew->file_size, users[j].cur_dir_id);                  //send cur_dir_id via file size
+                                    data.data_len = 0;
+                                    send_cycle(new_fd, (char*)&data, sizeof(int));
+                                    pthread_mutex_lock(&f.que.mutex);
+                                    que_insert(&f.que, pnew);
+                                    pthread_mutex_unlock(&f.que.mutex);
+                                    pthread_cond_signal(&f.cond);
+                                    break;
+                                }
                             }
                         }
-                        if (flag == 0)
+
+                        if (flag == 1)
                         {
 #ifdef _DEBUG
-                            printf("start downloading\n");
+                            printf("unknown command\n");
 #endif
-                            /* close(new_fd); */
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verification failed
+                            close(new_fd);
+                            continue;
+                        }
+                        if (flag == 2)
+                        {
+#ifdef _DEBUG
+                            printf("start sending\n");
+#endif
+                            continue;
+                        }
+                        if (flag == 3)
+                        {
+#ifdef _DEBUG
+                            printf("start receiving\n");
+#endif
+                            continue;
+                        }
+                        if (flag == -1)
+                        {
+#ifdef _DEBUG
+                            printf("token verification failed\n");
+#endif
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verification failed
+                            close(new_fd);
                             continue;
                         }
                         if (flag == -2)
@@ -147,13 +202,17 @@ int main(int argc, char** argv)
                             continue;
 
                         }
+                        if (flag == -3)
+                        {
 #ifdef _DEBUG
-                        printf("token verification failed\n");
+                            printf("puts: cannot put: File already exist\n");
 #endif
-                        data.data_len = -1;
-                        send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verification failed
-                        close(new_fd);
-                        continue;
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send file already exsit
+                            close(new_fd);
+                            continue;
+
+                        }
                     }
                     recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
                     recv_cycle(new_fd, data.buf, data.data_len);

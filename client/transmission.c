@@ -32,10 +32,12 @@ void print_help()
 {
     printf("----------welcome to Evilolipop Netdisk----------\n\n");
     printf("Usage:\n\n");
-    printf("list file: ls [file]\n");
-    printf("print working directory: pwd\n");
-    printf("change directory: cd [path]\n");
-    printf("this page: --help\n");
+    printf("list file:                 ls [<file>]\n");
+    printf("print working directory:   pwd\n");
+    printf("change directory:          cd <path>\n");
+    printf("download file:             gets <file>, directory not supported\n");
+    printf("upload file:               puts <file>, directory not supported\n");
+    printf("this page:                 --help\n");
 }
 
 int connect_server(int* socketFd, const char* ip, const char* port)
@@ -204,7 +206,12 @@ int cmd_interpret(const DataPackage* data)
             printf("-----$ %s\n", data->buf);
             return 2;
         }
-        if (strcmp(prefix, "puts"))
+        if (strcmp(prefix, "puts") == 0)
+        {
+            system("clear");
+            printf("-----$ %s\n", data->buf);
+            return 3;
+        }
         return 0;
     }
 }
@@ -231,16 +238,17 @@ void* get_files(void* p)
 {
     int ret, socketFd;
     DataPackage data;
-    GetsInfo* gets_info = (GetsInfo*)p;
-    ret = connect_server(&socketFd, gets_info->ip_address, gets_info->port);
+    TransInfo* trans_info = (TransInfo*)p;
+    ret = connect_server(&socketFd, trans_info->ip_address, trans_info->port);
     if (ret == -1)
     {
+        close(socketFd);
         pthread_exit(NULL);
     }
-    data.data_len = 1;
-    send_cycle(socketFd, (char*)&data, sizeof(int));        //1 for gets
-    data.data_len = strlen(gets_info->token) + 1;
-    strcpy(data.buf, gets_info->token);
+    data.data_len = 2;
+    send_cycle(socketFd, (char*)&data, sizeof(int));        //2 for gets
+    data.data_len = strlen(trans_info->token) + 1;
+    strcpy(data.buf, trans_info->token);
     send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send token
     recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
     if (data.data_len == -1)
@@ -249,8 +257,8 @@ void* get_files(void* p)
         pthread_exit(NULL);
     }
 
-    data.data_len = strlen(gets_info->cmd) + 1;
-    strcpy(data.buf, gets_info->cmd);
+    data.data_len = strlen(trans_info->cmd) + 1;
+    strcpy(data.buf, trans_info->cmd);
     send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send command
     recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
     if (data.data_len == -1)
@@ -261,7 +269,9 @@ void* get_files(void* p)
 
     recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
     recv_cycle(socketFd, data.buf, data.data_len);
-    int fd = open(data.buf, O_CREAT|O_RDWR, 0666);
+    char path_name[CMD_LEN] = "./downloads/";
+    strcat(path_name, data.buf);
+    int fd = open(path_name, O_CREAT|O_RDWR, 0666);
     if (fd == -1)
     {
         close(socketFd);
@@ -300,6 +310,126 @@ void* get_files(void* p)
             break;
         }
     }
+    close(socketFd);
+    pthread_exit(NULL);
+}
+
+void* put_files(void* p)
+{
+    int ret, socketFd;
+    DataPackage data;
+    TransInfo* trans_info = (TransInfo*)p;
+    ret = connect_server(&socketFd, trans_info->ip_address, trans_info->port);
+    if (ret == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    data.data_len = 3;
+    send_cycle(socketFd, (char*)&data, sizeof(int));        //3 for puts
+    data.data_len = strlen(trans_info->token) + 1;
+    strcpy(data.buf, trans_info->token);
+    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send token
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+    if (data.data_len == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    data.data_len = strlen(trans_info->cmd) + 1;
+    strcpy(data.buf, trans_info->cmd);
+    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send command
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+    if (data.data_len != 0)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    //open file
+    char file_path[CMD_LEN];
+    int i = 0;
+    while (trans_info->cmd[i] != '\0')
+    {
+        file_path[i] = trans_info->cmd[i + 5];
+        i++;
+    }
+    file_path[i] = '\0';
+    int fd = open(file_path, O_RDONLY);
+    if (ret == -1)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    //send filename
+    char file_name[FILE_NAME_LEN];
+    i = i + 5;
+    while (trans_info->cmd[i] != '/' && trans_info->cmd[i] != ' ')
+    {
+        i--;
+    }
+    i++;
+    int k = 0;
+    while (trans_info->cmd[i] != '\0')
+    {
+        file_name[k++] = trans_info->cmd[i++];
+    }
+    file_name[k] = '\0';
+    data.data_len = strlen(file_name) + 1;
+    strcpy(data.buf, file_name);
+    ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+    if (ret == -1)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    //send file size
+    struct stat buf;
+    ret = fstat(fd, &buf);
+    if (ret == -1)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    off_t file_size = buf.st_size;
+    data.data_len = sizeof(file_size);
+    sprintf(data.buf, "%ld", file_size);
+    send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+    if (ret == -1)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    //send file
+    while ((data.data_len = read(fd, data.buf, sizeof(data.buf))) > 0)
+    {
+        ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+        if (ret == -1)
+        {
+            close(fd);
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+    }
+
+    //send end of transmission
+    data.data_len = 0;
+    ret = send_cycle(socketFd, (char*)&data, sizeof(int));
+    if (ret == -1)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    printf("upload success\n");
+    close(fd);
     close(socketFd);
     pthread_exit(NULL);
 }
