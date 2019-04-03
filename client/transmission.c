@@ -182,6 +182,17 @@ int cmd_interpret(const DataPackage* data)
             }
             if (data->buf[i] == '\0')
             {
+                if (space == 0)
+                {
+                    if (!strcmp(prefix, "cd") || !strcmp(prefix, "puts")
+                        || !strcmp(prefix, "gets") || !strcmp(prefix, "remove"))
+                    {
+                        system("clear");
+                        printf("please enter file path\n");
+                        printf("-----$ %s\n", data->buf);
+                        return -1;
+                    }
+                }
                 break;
             }
             i++;
@@ -193,6 +204,7 @@ int cmd_interpret(const DataPackage* data)
             printf("-----$ %s\n", data->buf);
             return 2;
         }
+        if (strcmp(prefix, "puts"))
         return 0;
     }
 }
