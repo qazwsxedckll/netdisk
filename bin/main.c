@@ -85,8 +85,8 @@ int main(int argc, char** argv)
                     new_fd = accept(socketFd, NULL, NULL);
 #ifdef _DEBUG
                     printf("incoming connection\n");
-#endif
-                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get connection code 0 for login, 2 for gets, 3 for puts
+#endif                                                                      //get connection code 0 for login, 2 for gets, 3 for puts
+                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //4 for invitation code, 5 for regi name, 6 for password
                     if (data.data_len == 2 || data.data_len == 3)
                     {
 #ifdef _DEBUG
@@ -214,6 +214,84 @@ int main(int argc, char** argv)
 
                         }
                     }
+
+                    if (data.data_len == 4)
+                    {
+#ifdef _DEBUG
+                        printf("connection for invitation code\n");
+#endif
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get code
+                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (strcmp(data.buf, "cc27") == 0)
+                        {
+                            data.data_len = 0;
+                        }
+                        else
+                        {
+                            data.data_len = -1;
+                        }
+                        send_cycle(new_fd, (char*)&data, sizeof(int));
+                        close(new_fd);
+                        continue;
+                    }
+
+                    if (data.data_len == 5)
+                    {
+#ifdef _DEBUG
+                        printf("connection for regi name\n");
+#endif
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
+                        recv_cycle(new_fd, data.buf, data.data_len);
+                        strcpy(user_name, data.buf);
+                        MYSQL_RES* res;
+                        res = sql_select(conn, "user", "user_name", user_name);
+                        if (res == NULL)
+                        {
+                            mysql_free_result(res);
+                            data.data_len = 0;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                        else
+                        {
+#ifdef _DEBUG
+                            printf("username already used\n");
+#endif
+                            mysql_free_result(res);
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                    }
+
+                    if (data.data_len == 6)
+                    {
+#ifdef _DEBUG
+                        printf("connection for regi password\n");
+#endif
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
+                        recv_cycle(new_fd, data.buf, data.data_len);
+                        strcpy(user_name, data.buf);
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
+                        recv_cycle(new_fd, data.buf, data.data_len);
+
+                        ret = sql_insert_user(conn, user_name, data.buf);
+                        if (ret == -1)
+                        {
+                            data.data_len = -1;
+                        }
+                        else if (ret == 0)
+                        {
+                            data.data_len = 0;
+                        }
+                        send_cycle(new_fd, (char*)&data, sizeof(int));
+                        close(new_fd);
+                        continue;
+                    }
+
+                    //login
                     recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
                     recv_cycle(new_fd, data.buf, data.data_len);
                     strcpy(user_name, data.buf);
@@ -371,7 +449,7 @@ int main(int argc, char** argv)
                             data.data_len = strlen(data.buf) + 1;
                             send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
                         }
-                        if (ret == 3)
+                        if (ret == 3)       //remove success
                         {
                             strcpy(data.buf, cmd_path);
                             data.data_len = strlen(data.buf) + 1;

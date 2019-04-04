@@ -28,33 +28,214 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
-void print_help()
-{
-    printf("----------welcome to Evilolipop Netdisk----------\n\n");
-    printf("Usage:\n\n");
-    printf("list file:                 ls [<file>]\n");
-    printf("print working directory:   pwd\n");
-    printf("change directory:          cd <path>\n");
-    printf("download file:             gets <file>, directory not supported\n");
-    printf("upload file:               puts <file>, directory not supported\n");
-    printf("this page:                 --help\n");
-}
-
-int connect_server(int* socketFd, const char* ip, const char* port)
+void user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
 {
     int ret;
-    *socketFd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in serAddr;
-    serAddr.sin_family = AF_INET;
-    serAddr.sin_addr.s_addr = inet_addr(ip);
-    serAddr.sin_port = htons(atoi(port));
-    ret = connect(*socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
-    if (ret == -1)
+    int flag = -1, err;
+    char invi_code[5];
+    while (flag == -1)
     {
-        printf("connect failed\n");
-        return -1;
+        system("clear");
+        if (err == -1)
+        {
+            printf("connection failed, try again later\n");
+            err = 0;
+        }
+        if (err == -2)
+        {
+            printf("wrong invitation code\n");
+            err = 0;
+        }
+        if (err == -3)
+        {
+            printf("unknown error occured\n");
+            err = 0;
+        }
+        printf("Enter invitation code: ");
+        fflush(stdout);
+        ret = read(STDIN_FILENO, invi_code, sizeof(invi_code));
+        invi_code[ret - 1] = '\0';
+
+        //connect to server
+        ret = connect_server(socketFd, ip, port);
+        if (ret == -1)
+        {
+            err = -1;
+        }
+        data->data_len = 4;
+        send_cycle(*socketFd, (char*)data, sizeof(int));        //4 for invitation code
+        strcpy(data->buf, invi_code);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send code
+
+        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (data->data_len == 0)
+        {
+            flag = 0;
+            close(*socketFd);
+        }
+        else if (data->data_len == -1)
+        {
+            err = -2;
+            close(*socketFd);
+        }
+        else
+        {
+            err = -3;
+            close(*socketFd);
+        }
     }
-    return 0;
+
+    flag = -1;
+    while (flag == -1)
+    {
+        //input name
+        flag = -2;
+        while (flag == -2)
+        {
+            flag = 0;
+            system("clear");
+            printf("Enter invitation code: %s\n", invi_code);
+            if (err == -1)
+            {
+                printf("username too long!\n");
+                err = 0;
+            }
+            printf("Enter username: ");
+            fflush(stdout);
+            while (1)
+            {
+                ret = read(STDIN_FILENO, user_name, USER_LEN);
+                if (ret >= 20)
+                {
+                    err = -1;       //too long err
+                    flag = -1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+        user_name[ret - 1] = '\0';
+
+        //comfirm name
+        if (err == -1)
+        {
+            printf("connection failed, try again later\n");
+            err = 0;
+        }
+        if (err == -2)
+        {
+            printf("username already used\n");
+            err = 0;
+        }
+        if (err == -3)
+        {
+            printf("unknown error occured\n");
+            err = 0;
+        }
+
+        //connect to server
+        ret = connect_server(socketFd, ip, port);
+        if (ret == -1)
+        {
+            err = -1;
+        }
+        data->data_len = 5;
+        send_cycle(*socketFd, (char*)data, sizeof(int));        //5 for regi name
+        strcpy(data->buf, user_name);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send username
+
+        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (data->data_len == 0)
+        {
+            flag = 0;
+            close(*socketFd);
+        }
+        else if (data->data_len == -1)
+        {
+            err = -2;
+            close(*socketFd);
+        }
+        else
+        {
+            err = -3;
+            close(*socketFd);
+        }
+    }
+
+    flag = -1;
+    while (flag == -1)
+    {
+        //input password
+        char* password;
+        flag = -2;
+        while (flag == -2)
+        {
+            flag = 0;
+            system("clear");
+            printf("Enter invitation code: %s\n", invi_code);
+            printf("Enter username: %s\n", user_name);
+            if (err == -1)
+            {
+                printf("password too long!\n");
+                err = 0;
+            }
+            password = getpass("Enter password: ");
+            while (1)
+            {
+                if (strlen(password) >= 20)
+                {
+                    err = -1;       //too long err
+                    flag = -1;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        if (err == -1)
+        {
+            printf("connection failed, try again later\n");
+            err = 0;
+        }
+        if (err == -2)
+        {
+            printf("unknown error occured\n");
+            err = 0;
+        }
+
+        //connect to server
+        ret = connect_server(socketFd, ip, port);
+        if (ret == -1)
+        {
+            err = -1;
+        }
+        data->data_len = 6;
+        send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
+        strcpy(data->buf, user_name);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        strcpy(data->buf, password);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+
+        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (data->data_len == 0)
+        {
+            flag = 0;
+            close(*socketFd);
+        }
+        else if (data->data_len == -1)
+        {
+            err = -2;
+            close(*socketFd);
+        }
+    }
 }
 
 int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err)
@@ -68,6 +249,11 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         if (err == -1)
         {
             printf("wrong username or password\n");
+            err = 0;
+        }
+        if (err == -2)
+        {
+            printf("connection failed, try again later\n");
             err = 0;
         }
         if (err_flag == 1)
@@ -119,7 +305,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
     ret = connect_server(socketFd, ip, port);
     if (ret == -1)
     {
-        return -1;
+        return -2;
     }
     data->data_len = 0;
     send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
@@ -139,79 +325,6 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
     }
     else
     {
-        return 0;
-    }
-}
-
-int cmd_interpret(const DataPackage* data)
-{
-    if (strcmp(data->buf, "--help") == 0)
-    {
-        system("clear");
-        print_help();
-        return 1;
-    }
-    else
-    {
-        int i = 0;
-        int space = 0;
-        char prefix[10];
-        while (1)
-        {
-            if ((data->buf[i] == ' ' || data->buf[i] == '\0') && space == 0)
-            {
-                strncpy(prefix, data->buf, i);
-                prefix[i] = '\0';
-                if (strcmp(prefix, "ls") && strcmp(prefix, "cd") && strcmp(prefix, "pwd")
-                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "rm"))
-                {
-                    system("clear");
-                    printf("-----$ %s\n", data->buf);
-                    printf("invaild command\n");
-                    return -1;
-                }
-            }
-            if (data->buf[i] == ' ')
-            {
-                space++;
-                if (space == 2)
-                {
-                    system("clear");
-                    printf("invaild command\n");
-                    printf("-----$ %s\n", data->buf);
-                    return -1;
-                }
-            }
-            if (data->buf[i] == '\0')
-            {
-                if (space == 0)
-                {
-                    if (!strcmp(prefix, "cd") || !strcmp(prefix, "puts")
-                        || !strcmp(prefix, "gets") || !strcmp(prefix, "rm"))
-                    {
-                        system("clear");
-                        printf("please enter file path\n");
-                        printf("-----$ %s\n", data->buf);
-                        return -1;
-                    }
-                }
-                break;
-            }
-            i++;
-        }
-
-        if (strcmp(prefix, "gets") == 0)
-        {
-            system("clear");
-            printf("-----$ %s\n", data->buf);
-            return 2;
-        }
-        if (strcmp(prefix, "puts") == 0)
-        {
-            system("clear");
-            printf("-----$ %s\n", data->buf);
-            return 3;
-        }
         return 0;
     }
 }
