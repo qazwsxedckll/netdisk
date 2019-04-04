@@ -99,7 +99,7 @@ int sql_insert_userfile(MYSQL* conn, const char* user_id, const char* file_id)
 }
 
 int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int type, const char* file_name,
-                      int file_size, const char* file_md5)
+                    int file_size, const char* file_md5)
 {
     int ret;
     char query[QUERY_LEN];
@@ -173,4 +173,98 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
 #endif
     ret = mysql_query(conn, query);
     return ret;
+}
+
+int sql_delete_userfile(MYSQL* conn, const char* user_id, const char* file_id)
+{
+    char query[QUERY_LEN];
+    sprintf(query, "DELETE FROM user_file WHERE user_id = %s AND file_id = %s", user_id, file_id);
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    int ret = mysql_query(conn, query);
+    if (ret)
+    {
+#ifdef _DEBUG
+        printf("Error making query: %s\n", mysql_error(conn));
+#endif
+        return -1;
+    }
+    return 0;
+}
+
+int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
+{
+    int ret;
+    char query[QUERY_LEN];
+    MYSQL_RES* res;
+    MYSQL_ROW row;
+
+    //get user id
+    res = sql_select(conn, "user", "user_name", user_name);
+    if (res == NULL)
+    {
+        return -1;
+    }
+    row = mysql_fetch_row(res);
+    mysql_free_result(res);
+    char user_id[INT_LEN];
+    strcpy(user_id, row[0]);
+
+    //get file id
+    res = sql_select(conn, "file", "file_path", file_path);
+    if (res == NULL)
+    {
+        return -1;
+    }
+    row = mysql_fetch_row(res);
+    mysql_free_result(res);
+    char file_id[INT_LEN];
+    strcpy(file_id, row[0]);
+
+    //begin transaction
+    strcpy(query, "BEGIN");
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    if (ret)
+    {
+        return -1;
+    }
+
+    //delete table user_file
+    ret = sql_delete_userfile(conn, user_id, file_id);
+    if (ret)
+    {
+        strcpy(query, "ROLLBACK");
+#ifdef _DEBUG
+        printf("sql: %s\n", query);
+#endif
+        mysql_query(conn, query);
+        return -1;
+    }
+    
+    //delete tbale file
+    sprintf(query, "DELETE FROM file WHERE id = %s", file_id);
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    if (ret)
+    {
+        strcpy(query, "ROLLBACK");
+#ifdef _DEBUG
+        printf("sql: %s\n", query);
+#endif
+        mysql_query(conn, query);
+        return -1;
+    }
+
+    strcpy(query, "COMMIT");
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    return 0;
 }

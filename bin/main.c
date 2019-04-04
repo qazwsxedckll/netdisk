@@ -308,8 +308,10 @@ int main(int argc, char** argv)
                     /*return:
                      *  1 for normal cmd
                      *  2 for cd success
+                     *  3 for rm success
                      *  -1 for ls error
-                     *  -2 for cd error*/
+                     *  -2 for cd error
+                     *  -3 for rm error*/
                     if (strcmp(prefix, "ls") == 0)
                     {
                         ret = resolve_ls(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
@@ -318,7 +320,7 @@ int main(int argc, char** argv)
                     {
                         ret = resolve_pwd(&result, &res_lines, conn, users[j].cur_dir_id);
                     }
-                    else if(strcmp(prefix, "cd") == 0)
+                    else if (strcmp(prefix, "cd") == 0)
                     {
                         if (strlen(cmd_path) == 0)
                         {
@@ -328,6 +330,10 @@ int main(int argc, char** argv)
                         {
                             ret = resolve_cd(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
                         }
+                    }
+                    else if (strcmp(prefix, "rm") == 0)
+                    {
+                        ret = resolve_rm(cmd_path, conn, users[j].user_name, users[j].root_id, users[j].cur_dir_id);
                     }
 
                     //send result to client
@@ -340,6 +346,10 @@ int main(int argc, char** argv)
                         if (ret == -2)     //cd error
                         {
                             strcpy(data.buf, "cd: cannot access: No such directory");
+                        }
+                        if (ret == -3)
+                        {
+                            strcpy(data.buf, "rm: cannot remove: No such file");
                         }
                         data.data_len = strlen(data.buf) + 1;
                         send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
@@ -358,6 +368,12 @@ int main(int argc, char** argv)
                         if (ret == 2)      //cd success
                         {
                             strcpy(data.buf, result[0]);
+                            data.data_len = strlen(data.buf) + 1;
+                            send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                        }
+                        if (ret == 3)
+                        {
+                            strcpy(data.buf, cmd_path);
                             data.data_len = strlen(data.buf) + 1;
                             send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
                         }

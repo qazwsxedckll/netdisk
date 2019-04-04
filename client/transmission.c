@@ -163,7 +163,7 @@ int cmd_interpret(const DataPackage* data)
                 strncpy(prefix, data->buf, i);
                 prefix[i] = '\0';
                 if (strcmp(prefix, "ls") && strcmp(prefix, "cd") && strcmp(prefix, "pwd")
-                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "remove"))
+                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "rm"))
                 {
                     system("clear");
                     printf("-----$ %s\n", data->buf);
@@ -187,7 +187,7 @@ int cmd_interpret(const DataPackage* data)
                 if (space == 0)
                 {
                     if (!strcmp(prefix, "cd") || !strcmp(prefix, "puts")
-                        || !strcmp(prefix, "gets") || !strcmp(prefix, "remove"))
+                        || !strcmp(prefix, "gets") || !strcmp(prefix, "rm"))
                     {
                         system("clear");
                         printf("please enter file path\n");
@@ -234,34 +234,44 @@ int tran_cmd(int socket_fd, DataPackage* data)
     return 0;
 }
 
+int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int code)
+{
+    int ret;
+    ret = connect_server(socketFd, trans_info->ip_address, trans_info->port);
+    if (ret == -1)
+    {
+        return -1;
+    }
+    data->data_len = code;
+    send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets
+    data->data_len = strlen(trans_info->token) + 1;
+    strcpy(data->buf, trans_info->token);
+    send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send token
+    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
+    if (data->data_len == -1)
+    {
+        return -1;
+    }
+
+    data->data_len = strlen(trans_info->cmd) + 1;
+    strcpy(data->buf, trans_info->cmd);
+    send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send command
+    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
+    if (data->data_len == -1)
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
 void* get_files(void* p)
 {
     int ret, socketFd;
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
-    ret = connect_server(&socketFd, trans_info->ip_address, trans_info->port);
+    ret = thread_connect(&socketFd, &data, trans_info, 2);
     if (ret == -1)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
-    data.data_len = 2;
-    send_cycle(socketFd, (char*)&data, sizeof(int));        //2 for gets
-    data.data_len = strlen(trans_info->token) + 1;
-    strcpy(data.buf, trans_info->token);
-    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send token
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
-    if (data.data_len == -1)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
-
-    data.data_len = strlen(trans_info->cmd) + 1;
-    strcpy(data.buf, trans_info->cmd);
-    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send command
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
-    if (data.data_len == -1)
     {
         close(socketFd);
         pthread_exit(NULL);
@@ -319,29 +329,8 @@ void* put_files(void* p)
     int ret, socketFd;
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
-    ret = connect_server(&socketFd, trans_info->ip_address, trans_info->port);
+    ret = thread_connect(&socketFd, &data, trans_info, 3);
     if (ret == -1)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
-    data.data_len = 3;
-    send_cycle(socketFd, (char*)&data, sizeof(int));        //3 for puts
-    data.data_len = strlen(trans_info->token) + 1;
-    strcpy(data.buf, trans_info->token);
-    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send token
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
-    if (data.data_len == -1)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
-
-    data.data_len = strlen(trans_info->cmd) + 1;
-    strcpy(data.buf, trans_info->cmd);
-    send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len);//send command
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
-    if (data.data_len != 0)
     {
         close(socketFd);
         pthread_exit(NULL);
