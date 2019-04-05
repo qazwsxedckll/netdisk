@@ -1,0 +1,3 @@
+reading configuration file
+thread_num: 5
+max_client: 50

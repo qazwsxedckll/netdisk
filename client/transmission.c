@@ -427,7 +427,7 @@ void* get_files(void* p)
             write(fd, data.buf, data.data_len);
             transfered += data.data_len;
             end = time(NULL);
-            if (end - start >= 1)
+            if (end - start >= 3)
             {
                 printf("\r%4.1f%%", (float)transfered / size * 100);
                 start = end;
@@ -437,6 +437,7 @@ void* get_files(void* p)
         else
         {
             printf("\r%4.1f%%\n", (float)transfered / size * 100);
+            printf("download success\n");
             close(fd);
             break;
         }

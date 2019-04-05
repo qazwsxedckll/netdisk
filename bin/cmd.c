@@ -328,6 +328,7 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
     MYSQL_RES* res;
     MYSQL_ROW row;
 
+
     if (abs_flag == 0)
     {
         abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
@@ -363,6 +364,19 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
         res = sql_select(conn, "file", "file_path", regexp, 1);
         if (res == NULL)
         {
+            //delete account
+            if (strcmp(cmd_path, "/") == 0)
+            {
+                ret = sql_delete_user(conn, user_name);
+                if (ret)
+                {
+                    return -3;
+                }
+                else
+                {
+                    return -10;
+                }
+            }
             return 3;
         }
         num = mysql_num_rows(res);
@@ -372,6 +386,19 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
             resolve_rm(row[5], 1, conn, user_name, root_id, cur_dir_id);
         }
         mysql_free_result(res);
+        //delete account
+        if (strcmp(cmd_path, "/") == 0)
+        {
+            ret = sql_delete_user(conn, user_name);
+            if (ret)
+            {
+                return -3;
+            }
+            else
+            {
+                return -10;
+            }
+        }
         return 3;
     }
     else            //is file

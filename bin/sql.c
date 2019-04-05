@@ -274,6 +274,26 @@ int sql_delete_userfile(MYSQL* conn, const char* user_id, const char* file_id)
     return 0;
 }
 
+int sql_delete_user(MYSQL* conn, const char* user_name)
+{
+    int ret;
+    char query[QUERY_LEN];
+
+    sprintf(query, "DELETE FROM user WHERE user_name = '%s'", user_name);
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    if (ret)
+    {
+#ifdef _DEBUG
+        printf("Error making query: %s\n", mysql_error(conn));
+#endif
+        return -1;
+    }
+    return 0;
+}
+
 int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
 {
     int ret;
@@ -314,7 +334,7 @@ int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
         return -1;
     }
 
-    //delete table user_file
+    //delete userfile
     ret = sql_delete_userfile(conn, user_id, file_id);
     if (ret)
     {
@@ -325,8 +345,8 @@ int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
         mysql_query(conn, query);
         return -1;
     }
-    
-    //delete tbale file
+
+    //delete table file
     sprintf(query, "DELETE FROM file WHERE id = %s", file_id);
 #ifdef _DEBUG
     printf("sql: %s\n", query);

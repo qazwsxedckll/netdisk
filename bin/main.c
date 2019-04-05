@@ -392,7 +392,8 @@ int main(int argc, char** argv)
                      *  -1 for ls error
                      *  -2 for cd error
                      *  -3 for rm error
-                     *  -4 for mkdir error*/
+                     *  -4 for mkdir error
+                     *  -10 for account cancellation*/
                     if (strcmp(prefix, "ls") == 0)
                     {
                         ret = resolve_ls(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
@@ -439,6 +440,16 @@ int main(int argc, char** argv)
                         if (ret == -4)      //mkdir error
                         {
                             strcpy(data.buf, "mkdir: cannot make directory");
+                        }
+                        if (ret == -10)      //mkdir error
+                        {
+                            strcpy(data.buf, "你号没了，重新注册吧");
+                            data.data_len = strlen(data.buf) + 1;
+                            send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                            users[j].fd = 0;
+                            epoll_ctl(epfd, EPOLL_CTL_DEL, users[j].fd, &event);
+                            cur_client_num--;
+                            break;
                         }
                         data.data_len = strlen(data.buf) + 1;
                         send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));

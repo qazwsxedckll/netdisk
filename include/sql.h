@@ -15,4 +15,6 @@ int sql_insert_user_trans(MYSQL* conn, const char* user_name, const char* passwo
                           int type, const char* file_name, int file_size, const char* file_md5);
 
 int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path);
+
+int sql_delete_user(MYSQL* conn, const char* user_name);
 #endif
