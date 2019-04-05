@@ -14,7 +14,7 @@ void print_help();
 
 int cmd_interpret(const DataPackage* data);
 
-int login_page();
+int login_page(int flag);
 #endif
 
 

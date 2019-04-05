@@ -244,7 +244,7 @@ int main(int argc, char** argv)
                         recv_cycle(new_fd, data.buf, data.data_len);
                         strcpy(user_name, data.buf);
                         MYSQL_RES* res;
-                        res = sql_select(conn, "user", "user_name", user_name);
+                        res = sql_select(conn, "user", "user_name", user_name, 0);
                         if (res == NULL)
                         {
                             mysql_free_result(res);
@@ -268,7 +268,7 @@ int main(int argc, char** argv)
 
                     if (data.data_len == 6)
                     {
-#ifdef _DEBUG
+#ifdef _debug
                         printf("connection for regi password\n");
 #endif
                         recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
@@ -277,13 +277,16 @@ int main(int argc, char** argv)
                         recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
                         recv_cycle(new_fd, data.buf, data.data_len);
 
-                        ret = sql_insert_user(conn, user_name, data.buf);
+                        ret = sql_insert_user_trans(conn, user_name, data.buf, "1", 0, user_name, 0, "");
                         if (ret == -1)
                         {
                             data.data_len = -1;
                         }
                         else if (ret == 0)
                         {
+#ifdef _debug
+                        printf("user created\n");
+#endif
                             data.data_len = 0;
                         }
                         send_cycle(new_fd, (char*)&data, sizeof(int));
@@ -385,18 +388,18 @@ int main(int argc, char** argv)
                     cmd_interpret(data.buf, prefix, cmd_path);
                     /*return:
                      *  1 for normal cmd
-                     *  2 for cd success
                      *  3 for rm success
                      *  -1 for ls error
                      *  -2 for cd error
-                     *  -3 for rm error*/
+                     *  -3 for rm error
+                     *  -4 for mkdir error*/
                     if (strcmp(prefix, "ls") == 0)
                     {
                         ret = resolve_ls(&result, &res_lines, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
                     }
                     else if (strcmp(prefix, "pwd") == 0)
                     {
-                        ret = resolve_pwd(&result, &res_lines, conn, users[j].cur_dir_id);
+                        ret = resolve_pwd(&result, &res_lines, conn, users[j].cur_dir_id, strlen(users[j].user_name));
                     }
                     else if (strcmp(prefix, "cd") == 0)
                     {
@@ -411,7 +414,11 @@ int main(int argc, char** argv)
                     }
                     else if (strcmp(prefix, "rm") == 0)
                     {
-                        ret = resolve_rm(cmd_path, conn, users[j].user_name, users[j].root_id, users[j].cur_dir_id);
+                        ret = resolve_rm(cmd_path, 0, conn, users[j].user_name, users[j].root_id, users[j].cur_dir_id);
+                    }
+                    else if (strcmp(prefix, "mkdir") == 0)
+                    {
+                        ret = resolve_mkdir(&result, &res_lines, users[j].user_name, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
                     }
 
                     //send result to client
@@ -425,9 +432,13 @@ int main(int argc, char** argv)
                         {
                             strcpy(data.buf, "cd: cannot access: No such directory");
                         }
-                        if (ret == -3)
+                        if (ret == -3)      //rm error
                         {
                             strcpy(data.buf, "rm: cannot remove: No such file");
+                        }
+                        if (ret == -4)      //mkdir error
+                        {
+                            strcpy(data.buf, "mkdir: cannot make directory");
                         }
                         data.data_len = strlen(data.buf) + 1;
                         send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
@@ -443,15 +454,10 @@ int main(int argc, char** argv)
                                 send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
                             }
                         }
-                        if (ret == 2)      //cd success
-                        {
-                            strcpy(data.buf, result[0]);
-                            data.data_len = strlen(data.buf) + 1;
-                            send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
-                        }
                         if (ret == 3)       //remove success
                         {
                             strcpy(data.buf, cmd_path);
+                            strcat(data.buf, "\tis removed");
                             data.data_len = strlen(data.buf) + 1;
                             send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
                         }

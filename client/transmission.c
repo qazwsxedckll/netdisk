@@ -31,7 +31,7 @@ int recv_cycle(int fd, char* data, int recv_len)
 void user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
 {
     int ret;
-    int flag = -1, err;
+    int flag = -1, err = 0;
     char invi_code[5];
     while (flag == -1)
     {
@@ -53,9 +53,15 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
         }
         printf("Enter invitation code: ");
         fflush(stdout);
-        ret = read(STDIN_FILENO, invi_code, sizeof(invi_code));
-        invi_code[ret - 1] = '\0';
-
+        ret = read(STDIN_FILENO, invi_code, sizeof(invi_code) - 1);
+        invi_code[ret] = '\0';
+        //flush stdin
+        char ch;
+        while (read(STDIN_FILENO, &ch, 1))
+        {
+            if (ch == '\n')
+                break;
+        }
         //connect to server
         ret = connect_server(socketFd, ip, port);
         if (ret == -1)
@@ -87,6 +93,7 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
     }
 
     flag = -1;
+    err = 0;
     while (flag == -1)
     {
         //input name
@@ -96,7 +103,23 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             flag = 0;
             system("clear");
             printf("Enter invitation code: %s\n", invi_code);
+            //comfirm name
             if (err == -1)
+            {
+                printf("connection failed, try again later\n");
+                err = 0;
+            }
+            if (err == -2)
+            {
+                printf("username already used\n");
+                err = 0;
+            }
+            if (err == -3)
+            {
+                printf("unknown error occured\n");
+                err = 0;
+            }
+            if (err == -4)
             {
                 printf("username too long!\n");
                 err = 0;
@@ -108,33 +131,20 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
                 ret = read(STDIN_FILENO, user_name, USER_LEN);
                 if (ret >= 20)
                 {
-                    err = -1;       //too long err
-                    flag = -1;
+                    err = -4;       //too long err
+                    flag = -2;
                 }
                 else
                 {
                     break;
                 }
             }
+            if (err == 0)
+            {
+                flag = -1;
+            }
         }
         user_name[ret - 1] = '\0';
-
-        //comfirm name
-        if (err == -1)
-        {
-            printf("connection failed, try again later\n");
-            err = 0;
-        }
-        if (err == -2)
-        {
-            printf("username already used\n");
-            err = 0;
-        }
-        if (err == -3)
-        {
-            printf("unknown error occured\n");
-            err = 0;
-        }
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
@@ -180,33 +190,29 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             printf("Enter username: %s\n", user_name);
             if (err == -1)
             {
+                printf("connection failed, try again later\n");
+                err = 0;
+            }
+            if (err == -2)
+            {
+                printf("unknown error occured\n");
+                err = 0;
+            }
+            if (err == -3)
+            {
                 printf("password too long!\n");
                 err = 0;
             }
             password = getpass("Enter password: ");
-            while (1)
+            if (strlen(password) >= 20)
             {
-                if (strlen(password) >= 20)
-                {
-                    err = -1;       //too long err
-                    flag = -1;
-                }
-                else
-                {
-                    break;
-                }
+                err = -3;       //too long err
+                flag = -2;
             }
-        }
-
-        if (err == -1)
-        {
-            printf("connection failed, try again later\n");
-            err = 0;
-        }
-        if (err == -2)
-        {
-            printf("unknown error occured\n");
-            err = 0;
+            else
+            {
+                flag = -1;
+            }
         }
 
         //connect to server
@@ -356,7 +362,8 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
         return -1;
     }
     data->data_len = code;
-    send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets
+
+    send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets 3 for puts
     data->data_len = strlen(trans_info->token) + 1;
     strcpy(data->buf, trans_info->token);
     send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send token
@@ -530,7 +537,17 @@ void* put_files(void* p)
         close(socketFd);
         pthread_exit(NULL);
     }
-    printf("upload success\n");
+
+    //receive confirmation
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+    if (data.data_len == -1)
+    {
+        printf("upload failed\n");
+    }
+    else
+    {
+        printf("upload success\n");
+    }
     close(fd);
     close(socketFd);
     pthread_exit(NULL);

@@ -28,11 +28,18 @@ int sql_connect(MYSQL** conn)
     }
 }
 
-MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const char* condition)
+MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const char* condition, int reg_flag)
 {
     MYSQL_RES* res = NULL;
     char query[QUERY_LEN];
-    sprintf(query, "SELECT * FROM %s WHERE %s = '%s'", table, field, condition);
+    if (reg_flag == 1)
+    {
+        sprintf(query, "SELECT * FROM %s WHERE %s REGEXP '%s'", table, field, condition);
+    }
+    else
+    {
+        sprintf(query, "SELECT * FROM %s WHERE %s = '%s'", table, field, condition);
+    }
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif
@@ -58,12 +65,14 @@ MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const c
 
 int sql_insert_user(MYSQL* conn, const char* user_name, const char* password)
 {
+    int ret;
     char query[QUERY_LEN];
+
     sprintf(query, "INSERT INTO user VALUES (default, '%s', '%s')", user_name, password);
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif
-    int ret = mysql_query(conn, query);
+    ret = mysql_query(conn, query);
     if (ret)
     {
 #ifdef _DEBUG
@@ -106,17 +115,7 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
     MYSQL_RES* res;
     MYSQL_ROW row;
 
-    res = sql_select(conn, "user", "user_name", user_name);
-    if (res == NULL)
-    {
-        return -1;
-    }
-    row = mysql_fetch_row(res);
-    mysql_free_result(res);
-    char user_id[INT_LEN];
-    strcpy(user_id, row[0]);
-
-    res = sql_select(conn, "file", "id", dir_id);
+    res = sql_select(conn, "file", "id", dir_id, 0);
     if (res == NULL)
     {
         return -1;
@@ -126,6 +125,55 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
     char file_path[RESULT_LEN];
     sprintf(file_path, "%s/%s", row[5], file_name);
 
+    if (type == 0)
+    {
+        sprintf(query, "INSERT INTO file VALUES (default, %s, %d, '%s', NULL, '%s', NULL, default)",
+                dir_id, type, file_name, file_path);
+    }
+    else
+    {
+        sprintf(query, "INSERT INTO file VALUES (default, %s, %d, '%s', %d, '%s', '%s', default)",
+            dir_id, type, file_name, file_size, file_path, file_md5);
+    }
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    if (ret)
+    {
+        return -1;
+    }
+
+    //insert into table user_file
+    res = sql_select(conn, "user", "user_name", user_name, 0);
+    if (res == NULL)
+    {
+        return -1;
+    }
+    row = mysql_fetch_row(res);
+    mysql_free_result(res);
+    char user_id[INT_LEN];
+    strcpy(user_id, row[0]);
+    res = sql_select(conn, "file", "file_path", file_path, 0);
+    row = mysql_fetch_row(res);
+    mysql_free_result(res);
+    char file_id[INT_LEN];
+    strcpy(file_id, row[0]);
+
+    ret = sql_insert_userfile(conn, user_id, file_id);
+    if (ret)
+    {
+        return -1;
+    }
+}
+
+int sql_insert_user_trans(MYSQL* conn, const char* user_name, const char* password, const char* dir_id,
+                          int type, const char* file_name, int file_size, const char* file_md5)
+{
+    char query[QUERY_LEN];
+    int ret;
+
+    //transacton begin
     strcpy(query, "BEGIN");
 #ifdef _DEBUG
     printf("sql: %s\n", query);
@@ -135,29 +183,60 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
     {
         return -1;
     }
-    sprintf(query, "INSERT INTO file VALUES (default, %s, %d, '%s', %d, '%s', '%s', default)",
-            dir_id, type, file_name, file_size, file_path, file_md5);
+
+    //insert into table user
+    ret = sql_insert_user(conn, user_name, password);
+    if (ret)
+    {
+        strcpy(query, "ROLLBACK");
+#ifdef _DEBUG
+        printf("sql: %s\n", query);
+#endif
+        mysql_query(conn, query);
+        return -1;
+    }
+
+    //insert into table file and user_file
+    ret =sql_insert_file(conn, user_name, dir_id, type, file_name, file_size, file_md5);
+    if (ret)
+    {
+        strcpy(query, "ROLLBACK");
+#ifdef _DEBUG
+        printf("sql: %s\n", query);
+#endif
+        mysql_query(conn, query);
+        return -1;
+    }
+
+    //transaction commit
+    strcpy(query, "COMMIT");
+#ifdef _DEBUG
+    printf("sql: %s\n", query);
+#endif
+    ret = mysql_query(conn, query);
+    return ret;
+
+}
+
+int sql_insert_file_trans(MYSQL* conn, const char* user_name, const char* dir_id, int type, const char* file_name,
+                        int file_size, const char* file_md5)
+{
+    char query[QUERY_LEN];
+    int ret;
+
+    //transacton begin
+    strcpy(query, "BEGIN");
 #ifdef _DEBUG
     printf("sql: %s\n", query);
 #endif
     ret = mysql_query(conn, query);
     if (ret)
     {
-        strcpy(query, "ROLLBACK");
-#ifdef _DEBUG
-        printf("sql: %s\n", query);
-#endif
-        mysql_query(conn, query);
         return -1;
     }
 
-    res = sql_select(conn, "file", "file_md5", file_md5);
-    row = mysql_fetch_row(res);
-    mysql_free_result(res);
-    char file_id[INT_LEN];
-    strcpy(file_id, row[0]);
-    ret = sql_insert_userfile(conn, user_id, file_id);
-
+    //insert into table file and user_file
+    ret =sql_insert_file(conn, user_name,  dir_id, type, file_name, file_size, file_md5);
     if (ret)
     {
         strcpy(query, "ROLLBACK");
@@ -167,6 +246,8 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
         mysql_query(conn, query);
         return -1;
     }
+
+    //transaction commit
     strcpy(query, "COMMIT");
 #ifdef _DEBUG
     printf("sql: %s\n", query);
@@ -201,7 +282,7 @@ int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
     MYSQL_ROW row;
 
     //get user id
-    res = sql_select(conn, "user", "user_name", user_name);
+    res = sql_select(conn, "user", "user_name", user_name, 0);
     if (res == NULL)
     {
         return -1;
@@ -212,7 +293,7 @@ int sql_delete_file(MYSQL* conn, const char* user_name, const char* file_path)
     strcpy(user_id, row[0]);
 
     //get file id
-    res = sql_select(conn, "file", "file_path", file_path);
+    res = sql_select(conn, "file", "file_path", file_path, 0);
     if (res == NULL)
     {
         return -1;

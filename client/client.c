@@ -16,8 +16,13 @@ int connect_server(int* socketFd, const char* ip, const char* port)
     return 0;
 }
 
-int login_page()
+int login_page(int flag)
 {
+    system("clear");
+    if (flag)
+    {
+        printf("register success\n");
+    }
     printf("Please enter a num to continue... \n");
     printf("1.\tLogin\n");
     printf("2.\tRegister\n");
@@ -37,7 +42,8 @@ void print_help()
     printf("change directory:          cd <path>\n");
     printf("download file:             gets <file>, directory not supported\n");
     printf("upload file:               puts <file>, directory not supported\n");
-    printf("remove file;               rm <file>, directory not supported\n");
+    printf("remove file:               rm <file>, directory supported~~\n");
+    printf("make directory:            mkdir <file>, can only create in current directory\n");
     printf("this page:                 --help\n");
 }
 
@@ -61,7 +67,8 @@ int cmd_interpret(const DataPackage* data)
                 strncpy(prefix, data->buf, i);
                 prefix[i] = '\0';
                 if (strcmp(prefix, "ls") && strcmp(prefix, "cd") && strcmp(prefix, "pwd")
-                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "rm"))
+                    && strcmp(prefix, "puts") && strcmp(prefix, "gets") && strcmp(prefix, "rm")
+                    && strcmp(prefix, "mkdir"))
                 {
                     system("clear");
                     printf("-----$ %s\n", data->buf);
@@ -85,7 +92,8 @@ int cmd_interpret(const DataPackage* data)
                 if (space == 0)
                 {
                     if (!strcmp(prefix, "cd") || !strcmp(prefix, "puts")
-                        || !strcmp(prefix, "gets") || !strcmp(prefix, "rm"))
+                        || !strcmp(prefix, "gets") || !strcmp(prefix, "rm")
+                        || !strcmp(prefix, "mkdir"))
                     {
                         system("clear");
                         printf("please enter file path\n");
@@ -109,6 +117,12 @@ int cmd_interpret(const DataPackage* data)
             system("clear");
             printf("-----$ %s\n", data->buf);
             return 3;
+        }
+        if (strcmp(prefix, "mkdir") == 0)
+        {
+            system("clear");
+            printf("-----$ %s\n", data->buf);
+            return 0;
         }
         return 0;
     }

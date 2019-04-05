@@ -1,5 +1,21 @@
 #include "../include/cmd.h"
 
+void get_file_name(char* file_name, const char* cmd_path)
+{
+    int len = strlen(cmd_path);
+    while (cmd_path[len] != '/' && len != -1)
+    {
+        len--;
+    }
+    len++;
+    int i = 0;
+    while (cmd_path[len] != '\0')
+    {
+        file_name[i++] = cmd_path[len++];
+    }
+    file_name[i] = '\0';
+}
+
 char* convert_path(const char* path, MYSQL* conn, const char* root_id, const char* cur_dir_id)
 {
     char* abs_path = (char*)malloc(RESULT_LEN);
@@ -7,7 +23,7 @@ char* convert_path(const char* path, MYSQL* conn, const char* root_id, const cha
     MYSQL_ROW row;
     if (path[0] == '/')         //strat with user root dir
     {
-        res = sql_select(conn, "file", "id", root_id);
+        res = sql_select(conn, "file", "id", root_id, 0);
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         strcpy(abs_path, row[5]);
@@ -20,10 +36,10 @@ char* convert_path(const char* path, MYSQL* conn, const char* root_id, const cha
     }
     if (path[0] == '.' && path[1] == '.')       //start with parent dir
     {
-        res = sql_select(conn, "file", "id", cur_dir_id);
+        res = sql_select(conn, "file", "id", cur_dir_id, 0);
         row = mysql_fetch_row(res);
         mysql_free_result(res);
-        res = sql_select(conn, "file", "id", row[1]);
+        res = sql_select(conn, "file", "id", row[1], 0);
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         if (atoi(row[1]) == -1)
@@ -49,7 +65,7 @@ char* convert_path(const char* path, MYSQL* conn, const char* root_id, const cha
     }
     else        //start with cur dir
     {
-        res = sql_select(conn, "file", "id", cur_dir_id);
+        res = sql_select(conn, "file", "id", cur_dir_id, 0);
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         if (strcmp(path, "./") == 0 || strcmp(path, ".") == 0)
@@ -81,7 +97,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
     MYSQL_ROW row;
     if (strlen(path) == 0)   //only ls
     {
-        res = sql_select(conn, "file", "dir_id", cur_dir_id);
+        res = sql_select(conn, "file", "dir_id", cur_dir_id, 0);
         if (res == NULL)
         {
             *n = 0;
@@ -96,7 +112,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
         {
             return -1;
         }
-        res = sql_select(conn, "file","file_path", abs_path);
+        res = sql_select(conn, "file","file_path", abs_path, 0);
         free(abs_path);
         abs_path = NULL;
         if (res == NULL)
@@ -108,7 +124,7 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
         if (atoi(row[2]) == 0)  //is dir
         {
             mysql_free_result(res);
-            res = sql_select(conn, "file", "dir_id", row[0]);
+            res = sql_select(conn, "file", "dir_id", row[0], 0);
             if (res == NULL)        //empty dir
             {
                 *n = 0;
@@ -147,18 +163,30 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
     return 1;
 }
 
-int resolve_pwd(char*** result, int *n, MYSQL* conn, const char* cur_dir_id)
+int resolve_pwd(char*** result, int *n, MYSQL* conn, const char* cur_dir_id, int name_len)
 {
     MYSQL_RES* res;
     MYSQL_ROW row;
-    res = sql_select(conn, "file", "id",  cur_dir_id);
+    res = sql_select(conn, "file", "id",  cur_dir_id, 0);
     row = mysql_fetch_row(res);
     *n = 1;
     *result = (char**)malloc(sizeof(char*));
     (*result)[0] = (char*)malloc(RESULT_LEN);
-    strcpy((*result)[0], row[5]);
-    mysql_free_result(res);
+    if (row[5][8 + name_len + 1] == '\0')
+    {
+        mysql_free_result(res);
+        strcpy((*result)[0], "/");
+        return 1;
+    }
+    else
+    {
+        for (int i = 8 + name_len + 1; row[5][i - 1] != '\0'; i++)
+        {
+            (*result)[0][i - 8 - name_len - 1] = row[5][i];
+        }
+        mysql_free_result(res);
     return 1;
+    }
 }
 
 int resolve_cd(char*** result, int *n, const char* cmd_path, MYSQL* conn, char* cur_dir_id, const char* root_id)
@@ -171,7 +199,7 @@ int resolve_cd(char*** result, int *n, const char* cmd_path, MYSQL* conn, char* 
     {
         return -2;
     }
-    res = sql_select(conn, "file", "file_path", abs_path);
+    res = sql_select(conn, "file", "file_path", abs_path, 0);
     free(abs_path);
     abs_path = NULL;
     if (res == NULL)
@@ -184,15 +212,47 @@ int resolve_cd(char*** result, int *n, const char* cmd_path, MYSQL* conn, char* 
     if (atoi(row[2]) == 0)      //is dir
     {
         strcpy(cur_dir_id, row[0]);
-        *n = 1;
-        *result = (char**)malloc(sizeof(char*));
-        (*result)[0] = (char*)malloc(RESULT_LEN);
-        strcpy((*result)[0], row[5]);
-        return 2;
+        int ret;
+        ret = resolve_ls(result, n, "", conn, cur_dir_id, root_id);
+        return ret;
     }
     else    //is file
     {
         return -2;
+    }
+}
+
+int resolve_mkdir(char*** result, int *n, const char* user_name, const char* cmd_path, MYSQL* conn, const char* cur_dir_id, const char* root_id)
+{
+    int ret;
+    MYSQL_RES* res;
+
+    char file_name[FILE_NAME_LEN];
+    get_file_name(file_name, cmd_path);
+
+    char* abs_path;
+    abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
+    if (abs_path == NULL)
+    {
+        return -4;
+    }
+    res = sql_select(conn, "file", "file_path", abs_path, 0);
+    free(abs_path);
+    abs_path = NULL;
+    if (res == NULL)
+    {
+        ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 0, file_name, 0, NULL);
+        if (ret == -1)
+        {
+            return -4;
+        }
+        ret = resolve_ls(result, n, "", conn, cur_dir_id, root_id);
+        return ret;
+    }
+    else
+    {
+        mysql_free_result(res);
+        return -4;
     }
 }
 
@@ -207,7 +267,7 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     {
         return -1;
     }
-    res = sql_select(conn, "file", "file_path", abs_path);
+    res = sql_select(conn, "file", "file_path", abs_path, 0);
     free(abs_path);
     abs_path = NULL;
     if (res == NULL)
@@ -235,27 +295,16 @@ int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const c
 {
     MYSQL_RES* res;
     char* abs_path;
-    char file_name[FILE_NAME_LEN];
 
-    int len = strlen(cmd_path);
-    while (cmd_path[len] != '/' && len != -1)
-    {
-        len--;
-    }
-    len++;
-    int i;
-    while (cmd_path[len] != '\0')
-    {
-        file_name[i++] = cmd_path[len++];
-    }
-    file_name[i] = '\0';
+    char file_name[FILE_NAME_LEN];
+    get_file_name(file_name, cmd_path);
 
     abs_path = convert_path(file_name, conn, root_id, cur_dir_id);
     if (abs_path == NULL)
     {
         return -1;
     }
-    res = sql_select(conn, "file", "file_path", abs_path);
+    res = sql_select(conn, "file", "file_path", abs_path, 0);
     free(abs_path);
     abs_path = NULL;
     if (res == NULL)
@@ -272,18 +321,27 @@ int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const c
     }
 }
 
-int resolve_rm(const char* cmd_path, MYSQL* conn, const char* user_name, const char* root_id, const char* cur_dir_id)
+int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user_name, const char* root_id, const char* cur_dir_id)
 {
     char* abs_path;
+    int ret, num;
     MYSQL_RES* res;
     MYSQL_ROW row;
 
-    abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
+    if (abs_flag == 0)
+    {
+        abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
+    }
+    else
+    {
+        abs_path = (char*)malloc(RESULT_LEN);
+        strcpy(abs_path, cmd_path);
+    }
     if (abs_path == NULL)
     {
         return -3;
     }
-    res = sql_select(conn, "file", "file_path", abs_path);
+    res = sql_select(conn, "file", "file_path", abs_path, 0);
     if (res == NULL)
     {
         return -3;
@@ -293,15 +351,36 @@ int resolve_rm(const char* cmd_path, MYSQL* conn, const char* user_name, const c
     mysql_free_result(res);
     if (atoi(row[2]) == 0)      //is dir
     {
-        return -3;
+        ret = sql_delete_file(conn, user_name, abs_path);
+        if (ret == -1)
+        {
+            return -3;
+        }
+        char regexp[QUERY_LEN] = "^";
+        strcat(regexp, abs_path);
+        free(abs_path);
+        abs_path = NULL;
+        res = sql_select(conn, "file", "file_path", regexp, 1);
+        if (res == NULL)
+        {
+            return 3;
+        }
+        num = mysql_num_rows(res);
+        for (int i = 0; i < num; i++)
+        {
+            row = mysql_fetch_row(res);
+            resolve_rm(row[5], 1, conn, user_name, root_id, cur_dir_id);
+        }
+        mysql_free_result(res);
+        return 3;
     }
     else            //is file
     {
-        int ret;
         char file_md5[MD5_LEN];
         strcpy(file_md5, row[6]);
-        res = sql_select(conn, "file", "file_md5", file_md5);
-        int num = mysql_num_rows(res);
+        res = sql_select(conn, "file", "file_md5", file_md5, 0);
+        num = mysql_num_rows(res);
+        mysql_free_result(res);
 
         ret = sql_delete_file(conn, user_name, abs_path);
         free(abs_path);

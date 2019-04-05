@@ -167,14 +167,18 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
             ret = sql_connect(&conn);
             if (ret == -1)
             {
+                data.data_len = -1;
+                send_cycle(client_fd, (char*)&data, sizeof(int));
                 remove(path_name);
                 close(fd);
                 close(client_fd);
                 return -1;
             }
-            ret = sql_insert_file(conn, user_name, cur_dir_id, 1, file_name, file_size, file_md5);
+            ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 1, file_name, file_size, file_md5);
             if (ret)
             {
+                data.data_len = -1;
+                send_cycle(client_fd, (char*)&data, sizeof(int));
                 mysql_close(conn);
 #ifdef _DEBUG
                 printf("database closed\n");
@@ -184,6 +188,8 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
                 close(client_fd);
                 return -1;      //insert failed
             }
+            data.data_len = 0;
+            send_cycle(client_fd, (char*)&data, sizeof(int));
             mysql_close(conn);
 #ifdef _DEBUG
             printf("database closed\n");
