@@ -55,3 +55,4 @@ dkms.conf
 netdisk/
 core
 client/downloads/
+!client.exe
