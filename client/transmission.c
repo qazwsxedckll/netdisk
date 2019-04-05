@@ -399,6 +399,7 @@ void* get_files(void* p)
 
     recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
     recv_cycle(socketFd, data.buf, data.data_len);
+    mkdir("./downloads", 0777);
     char path_name[CMD_LEN] = "./downloads/";
     strcat(path_name, data.buf);
     int fd = open(path_name, O_CREAT|O_RDWR, 0666);
