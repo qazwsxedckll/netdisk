@@ -54,5 +54,4 @@ dkms.conf
 # custom
 netdisk/
 core
-client/downloads/
 !client.exe
