@@ -124,7 +124,9 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         send_cycle(client_fd, (char*)&data, sizeof(int));
         row = mysql_fetch_row(res);
         mysql_free_result(res);
-        ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 1, row[3], atol(row[4]), file_md5);
+        char file_name[RESULT_LEN];
+        strcpy(file_name, row[3]);
+        ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 1, file_name, atol(row[4]), file_md5);
         if (ret)
         {
             data.data_len = -1;

@@ -365,7 +365,7 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
         if (res == NULL)
         {
             //delete account
-            if (strcmp(cmd_path, "/") == 0)
+            if (strcmp(cmd_path, "/") == 0 || strcmp(cmd_path, "./") == 0)
             {
                 ret = sql_delete_user(conn, user_name);
                 if (ret)
@@ -387,7 +387,7 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
         }
         mysql_free_result(res);
         //delete account
-        if (strcmp(cmd_path, "/") == 0)
+        if (strcmp(cmd_path, "/") == 0 || strcmp(cmd_path, "./") == 0)
         {
             ret = sql_delete_user(conn, user_name);
             if (ret)
