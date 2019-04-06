@@ -11,6 +11,7 @@ int connect_server(int* socketFd, const char* ip, const char* port)
     ret = connect(*socketFd, (struct sockaddr*)&serAddr, sizeof(struct sockaddr));
     if (ret == -1)
     {
+        printf("connection failed\n");
         return -1;
     }
     return 0;

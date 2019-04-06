@@ -152,11 +152,11 @@ int resolve_ls(char*** result, int *n, const char* path, MYSQL* conn, const char
         //whether file is dir
         if (atoi(row[2]) == 0)
         {
-            sprintf((*result)[i], "%-30s%s", row[3], "dir");
+            sprintf((*result)[i], "%-20s%-20s%-20s", row[3], "dir", row[7]);
         }
         else
         {
-            sprintf((*result)[i], "%-30s%s", row[3], row[4]);
+            sprintf((*result)[i], "%-20s%-20s%-20s", row[3], row[4], row[7]);
         }
     }
     mysql_free_result(res);
@@ -265,6 +265,9 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     abs_path = convert_path(path, conn, root_id, cur_dir_id);
     if (abs_path == NULL)
     {
+#ifdef _DEBUG
+        printf("gets: cannot get: No such file or directory\n");
+#endif
         return -1;
     }
     res = sql_select(conn, "file", "file_path", abs_path, 0);
@@ -272,6 +275,9 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     abs_path = NULL;
     if (res == NULL)
     {
+#ifdef _DEBUG
+        printf("gets: cannot get: No such file or directory\n");
+#endif
         return -1;
     }
 
@@ -287,7 +293,7 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
         strcpy(file_size, row[4]);
         strcpy(file_name, row[3]);
         strcpy(file_md5, row[6]);
-        return 1;
+        return 0;
     }
 }
 
@@ -302,6 +308,9 @@ int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const c
     abs_path = convert_path(file_name, conn, root_id, cur_dir_id);
     if (abs_path == NULL)
     {
+#ifdef _DEBUG
+        printf("puts: cannot put: root dir\n");
+#endif
         return -1;
     }
     res = sql_select(conn, "file", "file_path", abs_path, 0);

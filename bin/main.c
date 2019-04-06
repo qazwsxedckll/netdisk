@@ -40,7 +40,7 @@ int main(int argc, char** argv)
     //connect database
     MYSQL* conn;
     ret = sql_connect(&conn);
-    if (ret == -1)
+    if (ret)
     {
         return -1;
     }
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     //inti tcp
     int socketFd;
     ret = tcp_init(&socketFd, configs, config_count);
-    if (ret == -1)
+    if (ret)
     {
         return -1;
     }
@@ -86,25 +86,42 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                     printf("incoming connection\n");
 #endif                                                                      //get connection code 0 for login, 2 for gets, 3 for puts
-                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //4 for invitation code, 5 for regi name, 6 for password
+                    if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //4 for invitation code, 5 for regi name, 6 for password
+                    {
+                        close(new_fd);
+                        continue;
+                    }
                     if (data.data_len == 0)
                     {
                         //login
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get username
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
                         strcpy(user_name, data.buf);
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get password
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
 #ifdef _DEBUG
                         printf("username: %s\n", user_name);
                         printf("password: %s\n", data.buf);
 #endif
                         ret = user_verify(conn, user_name, data.buf);
-                        if (ret == -1)
+                        if (ret)
                         {
-#ifdef _DEBUG
-                            printf("verification failed\n");
-#endif
                             data.data_len = -1;
                             send_cycle(new_fd, (char*)&data, sizeof(int));
                             close(new_fd);
@@ -112,18 +129,23 @@ int main(int argc, char** argv)
                         }
                         else
                         {
-#ifdef _DEBUG
-                            printf("verification success\n");
-#endif
                             data.data_len = -0;
-                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send confirm
+                            if(send_cycle(new_fd, (char*)&data, sizeof(int)))      //send confirm
+                            {
+                                close(new_fd);
+                                continue;
+                            }
                             //send token
                             time(&now);
                             strcpy(token, (char*)&now);
                             strcat(token, user_name);
                             data.data_len = strlen(token) + 1;
                             strcpy(data.buf, token);
-                            send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int)); //send token
+                            if (send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int))) //send token
+                            {
+                                close(new_fd);
+                                continue;
+                            }
 #ifdef _DEBUG
                             printf("token send: %s\n", token);
 #endif
@@ -160,8 +182,16 @@ int main(int argc, char** argv)
                         printf("connection for file transmission\n");
 #endif
 
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get token
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get token
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                            }
                         int flag = -1;
 #ifdef _DEBUG
                         printf("token recv: %s\n", data.buf);
@@ -170,21 +200,31 @@ int main(int argc, char** argv)
                         {
                             if (strcmp(users[j].token, data.buf) == 0)
                             {
-                                data.data_len = 0;
-                                send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verified
                                 flag = 1;                                           //token verified
-                                recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));     //recv command
-                                recv_cycle(new_fd, data.buf, data.data_len);
+                                data.data_len = 0;
+                                if (send_cycle(new_fd, (char*)&data, sizeof(int)))      //send token verified
+                                {
+                                    close(new_fd);
+                                    break;
+                                }
+                                if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //recv command
+                                {
+                                    close(new_fd);
+                                    break;
+                                }
+                                if (recv_cycle(new_fd, data.buf, data.data_len))
+                                {
+                                    close(new_fd);
+                                    break;
+                                }
                                 cmd_interpret(data.buf, prefix, cmd_path);
                                 pNode_t pnew = (pNode_t)calloc(1, sizeof(Node_t));
                                 if (strcmp(prefix, "gets") == 0)
                                 {
                                     flag = 2;
                                     ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
-                                    if (ret == -1)
+                                    if (ret)
                                     {
-                                        data.data_len = -1;
-                                        send_cycle(new_fd, (char*)&data, sizeof(int));
                                         free(pnew);
                                         pnew = NULL;
                                         flag = -2;
@@ -192,8 +232,6 @@ int main(int argc, char** argv)
                                     }
                                     pnew->new_fd = new_fd;
                                     pnew->code = 2;
-                                    data.data_len = 0;
-                                    send_cycle(new_fd, (char*)&data, sizeof(int));      //send file exist
                                     pthread_mutex_lock(&f.que.mutex);
                                     que_insert(&f.que, pnew);
                                     pthread_mutex_unlock(&f.que.mutex);
@@ -206,8 +244,6 @@ int main(int argc, char** argv)
                                     ret = resolve_puts(cmd_path, conn, users[j].root_id, users[j].cur_dir_id);
                                     if (ret == -1)
                                     {
-                                        data.data_len = -1;
-                                        send_cycle(new_fd, (char*)&data, sizeof(int));
                                         free(pnew);
                                         pnew = NULL;
                                         flag = -3;
@@ -217,8 +253,6 @@ int main(int argc, char** argv)
                                     pnew->code = 3;
                                     strcpy(pnew->file_name, users[j].user_name);    //send username via file_name
                                     strcpy(pnew->file_size, users[j].cur_dir_id);                  //send cur_dir_id via file size
-                                    data.data_len = 0;
-                                    send_cycle(new_fd, (char*)&data, sizeof(int));
                                     pthread_mutex_lock(&f.que.mutex);
                                     que_insert(&f.que, pnew);
                                     pthread_mutex_unlock(&f.que.mutex);
@@ -230,11 +264,8 @@ int main(int argc, char** argv)
 
                         if (flag == 1)
                         {
-#ifdef _DEBUG
-                            printf("unknown command\n");
-#endif
-                            data.data_len = -1;
-                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send token verification failed
+                            data.data_len = 1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));  //transmission interrupted;
                             close(new_fd);
                             continue;
                         }
@@ -243,6 +274,8 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                             printf("start sending\n");
 #endif
+                            data.data_len = 2;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
                             continue;
                         }
                         if (flag == 3)
@@ -250,6 +283,8 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                             printf("start receiving\n");
 #endif
+                            data.data_len = 3;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
                             continue;
                         }
                         if (flag == -1)
@@ -262,23 +297,17 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
-                        if (flag == -2)
+                        if (flag == -2)                                         //gets: cannot get: No such file or directory
                         {
-#ifdef _DEBUG
-                            printf("gets: cannot get: No such file or directory\n");
-#endif
-                            data.data_len = -1;
+                            data.data_len = -2;
                             send_cycle(new_fd, (char*)&data, sizeof(int));      //send file not exist
                             close(new_fd);
                             continue;
 
                         }
-                        if (flag == -3)
+                        if (flag == -3)                                         //puts: cannot put: File already exist
                         {
-#ifdef _DEBUG
-                            printf("puts: cannot put: File already exist\n");
-#endif
-                            data.data_len = -1;
+                            data.data_len = -3;
                             send_cycle(new_fd, (char*)&data, sizeof(int));      //send file already exsit
                             close(new_fd);
                             continue;
@@ -291,8 +320,16 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                         printf("connection for invitation code\n");
 #endif
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get code
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get code
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
                         if (strcmp(data.buf, "cc27") == 0)
                         {
                             data.data_len = 0;
@@ -311,8 +348,16 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
                         printf("connection for regi name\n");
 #endif
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get username
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
                         strcpy(user_name, data.buf);
                         MYSQL_RES* res;
                         res = sql_select(conn, "user", "user_name", user_name, 0);
@@ -342,11 +387,27 @@ int main(int argc, char** argv)
 #ifdef _debug
                         printf("connection for regi password\n");
 #endif
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get username
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
                         strcpy(user_name, data.buf);
-                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
-                        recv_cycle(new_fd, data.buf, data.data_len);
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get password
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
 
                         ret = sql_insert_user_trans(conn, user_name, data.buf, "1", 0, user_name, 0, "");
                         if (ret == -1)
@@ -380,17 +441,23 @@ int main(int argc, char** argv)
                 if (evs[i].data.fd == users[j].fd)
                 {
                     ret = recv_cycle(users[j].fd, (char*)&data.data_len, sizeof(int));
-                    if (ret == -1)
+                    if (ret)
                     {
 #ifdef _DEBUG
                         printf("client disconnected\n");
 #endif
+                        close(users[j].fd);
                         users[j].fd = 0;
                         epoll_ctl(epfd, EPOLL_CTL_DEL, users[j].fd, &event);
                         cur_client_num--;
                         break;
                     }
-                    recv_cycle(users[j].fd, data.buf, data.data_len);
+                    if (recv_cycle(users[j].fd, data.buf, data.data_len))
+                    {
+                        users[j].fd = 0;
+                        close(users[j].fd);
+                        continue;
+                    }
 #ifdef _DEBUG
                     printf("received form client: %s\n", data.buf);
 #endif
@@ -456,13 +523,19 @@ int main(int argc, char** argv)
                             strcpy(data.buf, "你号没了，重新注册吧");
                             data.data_len = strlen(data.buf) + 1;
                             send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                            close(users[j].fd);
                             users[j].fd = 0;
                             epoll_ctl(epfd, EPOLL_CTL_DEL, users[j].fd, &event);
                             cur_client_num--;
                             break;
                         }
                         data.data_len = strlen(data.buf) + 1;
-                        send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                        if (send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int)))
+                        {
+                            users[j].fd = 0;
+                            close(users[j].fd);
+                            break;
+                        }
                     }
                     else
                     {
@@ -472,7 +545,12 @@ int main(int argc, char** argv)
                             {
                                 strcpy(data.buf, result[i]);
                                 data.data_len = strlen(data.buf) + 1;
-                                send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                                if (send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int)))
+                                {
+                                    users[j].fd = 0;
+                                    close(users[j].fd);
+                                    break;
+                                }
                             }
                         }
                         if (ret == 3)       //remove success
@@ -480,12 +558,21 @@ int main(int argc, char** argv)
                             strcpy(data.buf, cmd_path);
                             strcat(data.buf, "\tis removed");
                             data.data_len = strlen(data.buf) + 1;
-                            send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int));
+                            if (send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int)))
+                            {
+                                users[j].fd = 0;
+                                close(users[j].fd);
+                                break;
+                            }
                         }
                     }
                     //send end of transmission
                     data.data_len = 0;
-                    send_cycle(users[j].fd, (char*)&data, sizeof(int));
+                    if (send_cycle(users[j].fd, (char*)&data, sizeof(int)))
+                    {
+                        users[j].fd = 0;
+                        close(users[j].fd);
+                    }
                     break;
                 }
             }
