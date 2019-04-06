@@ -87,6 +87,73 @@ int main(int argc, char** argv)
                     printf("incoming connection\n");
 #endif                                                                      //get connection code 0 for login, 2 for gets, 3 for puts
                     recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //4 for invitation code, 5 for regi name, 6 for password
+                    if (data.data_len == 0)
+                    {
+                        //login
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
+                        recv_cycle(new_fd, data.buf, data.data_len);
+                        strcpy(user_name, data.buf);
+                        recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
+                        recv_cycle(new_fd, data.buf, data.data_len);
+#ifdef _DEBUG
+                        printf("username: %s\n", user_name);
+                        printf("password: %s\n", data.buf);
+#endif
+                        ret = user_verify(conn, user_name, data.buf);
+                        if (ret == -1)
+                        {
+#ifdef _DEBUG
+                            printf("verification failed\n");
+#endif
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                        else
+                        {
+#ifdef _DEBUG
+                            printf("verification success\n");
+#endif
+                            data.data_len = -0;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send confirm
+                            //send token
+                            time(&now);
+                            strcpy(token, (char*)&now);
+                            strcat(token, user_name);
+                            data.data_len = strlen(token) + 1;
+                            strcpy(data.buf, token);
+                            send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int)); //send token
+#ifdef _DEBUG
+                            printf("token send: %s\n", token);
+#endif
+                        }
+
+                        for (j = 0; j < max_client; j++)
+                        {
+                            if (users[j].fd == 0)
+                            {
+                                users[j].fd = new_fd;
+                                break;
+                            }
+                        }
+                        //sql root dir by user_name
+                        char* root_dir = user_find_root(conn, user_name);
+                        strcpy(users[j].root_id, root_dir);
+                        strcpy(users[j].cur_dir_id, root_dir);
+                        strcpy(users[j].user_name, user_name);
+                        strcpy(users[j].token, token);
+                        free(root_dir);
+                        root_dir = NULL;
+                        event.data.fd = users[j].fd;
+                        epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
+                        cur_client_num++;
+#ifdef _DEBUG
+                        printf("cur_client_num: %d\n", cur_client_num);
+#endif
+                        continue;
+                    }
+
                     if (data.data_len == 2 || data.data_len == 3)
                     {
 #ifdef _DEBUG
@@ -116,6 +183,8 @@ int main(int argc, char** argv)
                                     ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
                                     if (ret == -1)
                                     {
+                                        data.data_len = -1;
+                                        send_cycle(new_fd, (char*)&data, sizeof(int));
                                         free(pnew);
                                         pnew = NULL;
                                         flag = -2;
@@ -137,6 +206,8 @@ int main(int argc, char** argv)
                                     ret = resolve_puts(cmd_path, conn, users[j].root_id, users[j].cur_dir_id);
                                     if (ret == -1)
                                     {
+                                        data.data_len = -1;
+                                        send_cycle(new_fd, (char*)&data, sizeof(int));
                                         free(pnew);
                                         pnew = NULL;
                                         flag = -3;
@@ -285,7 +356,7 @@ int main(int argc, char** argv)
                         else if (ret == 0)
                         {
 #ifdef _debug
-                        printf("user created\n");
+                            printf("user created\n");
 #endif
                             data.data_len = 0;
                         }
@@ -294,67 +365,6 @@ int main(int argc, char** argv)
                         continue;
                     }
 
-                    //login
-                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get username
-                    recv_cycle(new_fd, data.buf, data.data_len);
-                    strcpy(user_name, data.buf);
-                    recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)); //get password
-                    recv_cycle(new_fd, data.buf, data.data_len);
-#ifdef _DEBUG
-                    printf("username: %s\n", user_name);
-                    printf("password: %s\n", data.buf);
-#endif
-                    ret = user_verify(conn, user_name, data.buf);
-                    if (ret == -1)
-                    {
-#ifdef _DEBUG
-                        printf("verification failed\n");
-#endif
-                        data.data_len = -1;
-                        send_cycle(new_fd, (char*)&data, sizeof(int));
-                        close(new_fd);
-                        continue;
-                    }
-                    else
-                    {
-#ifdef _DEBUG
-                        printf("verification success\n");
-#endif
-                        //send token
-                        time(&now);
-                        strcpy(token, (char*)&now);
-                        strcat(token, user_name);
-                        data.data_len = strlen(token) + 1;
-                        strcpy(data.buf, token);
-                        send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int));
-#ifdef _DEBUG
-                        printf("token send: %s\n", token);
-#endif
-                    }
-
-                    for (j = 0; j < max_client; j++)
-                    {
-                        if (users[j].fd == 0)
-                        {
-                            users[j].fd = new_fd;
-                            break;
-                        }
-                    }
-                    //sql root dir by user_name
-                    char* root_dir = user_find_root(conn, user_name);
-                    strcpy(users[j].root_id, root_dir);
-                    strcpy(users[j].cur_dir_id, root_dir);
-                    strcpy(users[j].user_name, user_name);
-                    strcpy(users[j].token, token);
-                    free(root_dir);
-                    root_dir = NULL;
-                    event.data.fd = users[j].fd;
-                    epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
-                    cur_client_num++;
-#ifdef _DEBUG
-                    printf("cur_client_num: %d\n", cur_client_num);
-#endif
-                    continue;
                 }
                 else
                 {

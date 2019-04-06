@@ -6,9 +6,9 @@
 
 int tran_cmd(int fd, DataPackage* data);
 
-void user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data);
+int user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data);
 
-int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err);
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data);
 
 void* get_files(void* p);
 

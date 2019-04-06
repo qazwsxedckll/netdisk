@@ -28,7 +28,7 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
-void user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
+int user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
 {
     int ret;
     int flag = -1, err = 0;
@@ -51,6 +51,7 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             printf("unknown error occured\n");
             err = 0;
         }
+        printf("Enter '0000' to go back\n");
         printf("Enter invitation code: ");
         fflush(stdout);
         ret = read(STDIN_FILENO, invi_code, sizeof(invi_code) - 1);
@@ -61,6 +62,10 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
         {
             if (ch == '\n')
                 break;
+        }
+        if (strcmp(invi_code, "0000") == 0)
+        {
+            return -1;
         }
         //connect to server
         ret = connect_server(socketFd, ip, port);
@@ -102,6 +107,7 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
         {
             flag = 0;
             system("clear");
+            printf("Enter '0' to go back\n");
             printf("Enter invitation code: %s\n", invi_code);
             //comfirm name
             if (err == -1)
@@ -145,6 +151,10 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             }
         }
         user_name[ret - 1] = '\0';
+        if (strcmp(user_name, "0") == 0)
+        {
+            return -1;
+        }
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
@@ -186,6 +196,7 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
         {
             flag = 0;
             system("clear");
+            printf("Enter '0' to go back\n");
             printf("Enter invitation code: %s\n", invi_code);
             printf("Enter username: %s\n", user_name);
             if (err == -1)
@@ -213,6 +224,10 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             {
                 flag = -1;
             }
+        }
+        if (strcmp(password, "0") == 0)
+        {
+            return -1;
         }
 
         //connect to server
@@ -242,97 +257,123 @@ void user_signup(int* socketFd, const char* ip, const char* port, char* user_nam
             close(*socketFd);
         }
     }
+    return 0;
 }
 
-int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, int err)
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
 {
-    int ret;
-    int flag, err_flag = 0;
-    do
+    int flag, ret, err;
+    flag = -1;
+    err = 0;
+
+    while (flag == -1)
     {
-        flag = 0;
-        system("clear");
-        if (err == -1)
+        //input name
+        flag = -2;
+        while (flag == -2)
         {
-            printf("wrong username or password\n");
-            err = 0;
-        }
-        if (err == -2)
-        {
-            printf("connection failed, try again later\n");
-            err = 0;
-        }
-        if (err_flag == 1)
-        {
-            printf("username too long!\n");
-            err_flag = 0;
-        }
-        printf("Enter username: ");
-        fflush(stdout);
-        while (1)
-        {
-            ret = read(STDIN_FILENO, user_name, USER_LEN);
-            if (ret >= 20)
+            flag = 0;
+            system("clear");
+            if (err == -1)
             {
-                flag = 1;
-                err_flag = 1;       //too long err
+                printf("connection failed, try again later\n");
+                err = 0;
+            }
+            if (err == -2)
+            {
+                printf("username too long!\n");
+                err = 0;
+            }
+            if (err == -3)
+            {
+                printf("wrong username or password\n");
+                err = 0;
+            }
+            printf("Enter '0' to go back\n");
+            printf("Enter username: ");
+            fflush(stdout);
+            while (1)
+            {
+                ret = read(STDIN_FILENO, user_name, USER_LEN);
+                if (ret >= 20)
+                {
+                    err = -2;       //too long err
+                    flag = -2;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            if (err == 0)
+            {
+                flag = -1;
+            }
+        }
+        user_name[ret - 1] = '\0';
+        if (strcmp(user_name, "0") == 0)
+        {
+            return -1;
+        }
+
+        //input password
+        char* password;
+        flag = -2;
+        while (flag == -2)
+        {
+            flag = 0;
+            system("clear");
+            printf("Enter '0' to go back\n");
+            printf("Enter username: %s\n", user_name);
+            if (err == -1)
+            {
+                printf("password too long!\n");
+                err = 0;
+            }
+            password = getpass("Enter password: ");
+            if (strlen(password) >= 20)
+            {
+                err = -1;       //too long err
+                flag = -2;
             }
             else
             {
-                break;
+                flag = -1;
             }
         }
-    } while (flag == 1);
-    user_name[ret - 1] = '\0';
-
-    char* password;
-    err_flag = 0;
-    while (1)
-    {
-        if (err_flag == 1)
+        if (strcmp(password, "0") == 0)
         {
-            system("clear");
-            printf("Enter username: %s\n", user_name);
-            printf("password too long!\n");
-            err_flag = 0;
+            return -1;
         }
-        password = getpass("Enter password: ");
-        if (strlen(password) > 20)
-        {
-            err_flag = 1;
-        }
-        else
-        {
-            break;
-        }
-    }
 
-    //connect to server
-    ret = connect_server(socketFd, ip, port);
-    if (ret == -1)
-    {
-        return -2;
-    }
-    data->data_len = 0;
-    send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
-    data->data_len = strlen(user_name) + 1;
-    strcpy(data->buf, user_name);
-    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send username
-    data->data_len = strlen(password) + 1;
-    strcpy(data->buf, password);
-    send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+        //connect to server
+        ret = connect_server(socketFd, ip, port);
+        if (ret == -1)
+        {
+            err = -1;
+            continue;
+        }
+        data->data_len = 0;
+        send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
+        strcpy(data->buf, user_name);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        strcpy(data->buf, password);
+        data->data_len = strlen(data->buf) + 1;
+        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
 
-    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
-    recv_cycle(*socketFd, data->buf, data->data_len);
-    if (data->data_len == -1)
-    {
-        close(*socketFd);
-        return -1;
+        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirm
+        if (data->data_len == -1)
+        {
+            err = -3;
+            continue;
+        }
+
+        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
+        recv_cycle(*socketFd, data->buf, data->data_len);
+        break;
     }
-    else
-    {
-        return 0;
-    }
+    return 0;
 }
 
 int tran_cmd(int socket_fd, DataPackage* data)
@@ -475,6 +516,8 @@ void* put_files(void* p)
     }
 
     //send md5
+    printf("\ruploading...   0.0%%");
+    fflush(stdout);
     char file_md5[MD5_LEN] = {0};
     compute_file_md5(fd, file_md5);
     strcpy(data.buf, file_md5);

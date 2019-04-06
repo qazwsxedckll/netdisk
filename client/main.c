@@ -27,35 +27,29 @@ int main(int argc, char** argv)
     while (1)
     {
         ret = login_page(regi_flag);
-        if (ret == 1)
+        if (ret == '1')
         {
-            break;
-        }
-        else if (ret == 2)
-        {
-            user_signup(&socketFd, argv[1], argv[2], user_name, &data);
-            regi_flag = 1;
-        }
-        else if (ret == 0)
-        {
-            return 0;
-        }
-        else
-        {
-            system("clear");
-            printf("wrong num, are you on purpose?\n");
-        }
-    }
-
-    //user authentication
-    ret = 0;
-    while (1)
-    {
-        ret = tran_authen(&socketFd, argv[1], argv[2], user_name, &data, ret);
-        if (ret == 0)
-        {
+            //user authentication
+            ret = tran_authen(&socketFd, argv[1], argv[2], user_name, &data);
+            if (ret == -1)
+            {
+                continue;
+            }
             strcpy(trans_info.token, data.buf);
             break;
+        }
+        else if (ret == '2')
+        {
+            user_signup(&socketFd, argv[1], argv[2], user_name, &data);
+            if (ret == -1)
+            {
+                continue;
+            }
+            regi_flag = 1;
+        }
+        else if (ret == '0')
+        {
+            return 0;
         }
     }
 

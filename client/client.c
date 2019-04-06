@@ -28,8 +28,9 @@ int login_page(int flag)
     printf("2.\tRegister\n");
     printf("\n");
     printf("0.\tExit\n");
-    int i;
-    scanf("%d", &i);
+    int i, c;
+    i = getchar();
+    while ((c = getchar()) != '\n');
     return i;
 }
 
@@ -117,12 +118,6 @@ int cmd_interpret(const DataPackage* data)
             system("clear");
             printf("-----$ %s\n", data->buf);
             return 3;
-        }
-        if (strcmp(prefix, "mkdir") == 0)
-        {
-            system("clear");
-            printf("-----$ %s\n", data->buf);
-            return 0;
         }
         return 0;
     }
