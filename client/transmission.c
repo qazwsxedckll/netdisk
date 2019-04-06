@@ -416,7 +416,7 @@ void* get_files(void* p)
     int transfered = 0;
     time_t start, end;
     start = time(NULL);
-    printf("\r%4.1f%%", (float)transfered / size * 100);
+    printf("\rdownloading... %4.1f%%", (float)transfered / size * 100);
     fflush(stdout);
     while (1)
     {
@@ -429,14 +429,14 @@ void* get_files(void* p)
             end = time(NULL);
             if (end - start >= 3)
             {
-                printf("\r%4.1f%%", (float)transfered / size * 100);
+                printf("\rdownloading... %4.1f%%", (float)transfered / size * 100);
                 start = end;
                 fflush(stdout);
             }
         }
         else
         {
-            printf("\r%4.1f%%\n", (float)transfered / size * 100);
+            printf("\rdownloading... %4.1f%%\n", (float)transfered / size * 100);
             printf("download success\n");
             close(fd);
             break;
@@ -474,8 +474,42 @@ void* put_files(void* p)
         pthread_exit(NULL);
     }
 
+    //send md5
+    char file_md5[MD5_LEN] = {0};
+    compute_file_md5(fd, file_md5);
+    strcpy(data.buf, file_md5);
+    data.data_len = strlen(data.buf) + 1;
+    ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+    if (ret == -1)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv md5 confirm
+    recv_cycle(socketFd, data.buf, data.data_len);
+    if (data.data_len == -1)        //server cannot connect database
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    if (data.data_len == 1)         //file already exist
+    {
+        printf("\ruploading... 100.0%%\n");
+        printf("upload success\n");
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    if (data.data_len == 0)
+    {
+        lseek(fd, 0, SEEK_SET);
+    }
+
     //send filename
-    char file_name[FILE_NAME_LEN];
+    char file_name[FILE_NAME_LEN + 1];
     i = i + 5;
     while (trans_info->cmd[i] != '/' && trans_info->cmd[i] != ' ')
     {
@@ -509,7 +543,7 @@ void* put_files(void* p)
     }
     off_t file_size = buf.st_size;
     sprintf(data.buf, "%ld", file_size);
-    data.data_len = strlen(data.buf);
+    data.data_len = strlen(data.buf) + 1;
     send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
     if (ret == -1)
     {
@@ -519,9 +553,22 @@ void* put_files(void* p)
     }
 
     //send file
+    int transfered = 0;
+    time_t start, end;
+    start = time(NULL);
+    printf("\ruploading... %4.1f%%", (float)transfered / file_size * 100);
+    fflush(stdout);
     while ((data.data_len = read(fd, data.buf, sizeof(data.buf))) > 0)
     {
         ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+        transfered += data.data_len;
+        end = time(NULL);
+        if (end - start >= 3)
+        {
+            printf("\ruploading... %4.1f%%", (float)transfered / file_size * 100);
+            start = end;
+            fflush(stdout);
+        }
         if (ret == -1)
         {
             close(fd);
@@ -548,6 +595,7 @@ void* put_files(void* p)
     }
     else
     {
+        printf("\ruploading... %4.1f%%\n", (float)transfered / file_size * 100);
         printf("upload success\n");
     }
     close(fd);

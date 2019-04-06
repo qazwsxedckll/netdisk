@@ -86,9 +86,67 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     char file_name[FILE_NAME_LEN];
     long file_size;
     char file_md5[MD5_LEN];
+    MYSQL* conn;
+    MYSQL_RES* res;
+    MYSQL_ROW row;
 
-    char path_name[RESULT_LEN] = "../netdisk/tmp_";
-    strcat(path_name, user_name);
+    ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv md5;
+    if (ret == -1)
+    {
+        close(client_fd);
+        return -1;
+    }
+    ret = recv_cycle(client_fd, data.buf, data.data_len);
+    if (ret == -1)
+    {
+        close(client_fd);
+        return -1;
+    }
+    strcpy(file_md5, data.buf);
+    ret = sql_connect(&conn);
+    if (ret == -1)
+    {
+        data.data_len = -1;
+        send_cycle(client_fd, (char*)&data, sizeof(int));
+        close(client_fd);
+        return -1;
+    }
+    res = sql_select(conn, "file", "file_md5", file_md5, 0);
+    if (res == NULL)        //file not exist
+    {
+        mysql_free_result(res);
+        data.data_len = 0;
+        send_cycle(client_fd, (char*)&data, sizeof(int));
+    }
+    else            //file already exist
+    {
+        data.data_len = 1;
+        send_cycle(client_fd, (char*)&data, sizeof(int));
+        row = mysql_fetch_row(res);
+        mysql_free_result(res);
+        ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 1, row[3], atol(row[4]), file_md5);
+        if (ret)
+        {
+            data.data_len = -1;
+            send_cycle(client_fd, (char*)&data, sizeof(int));
+            mysql_close(conn);
+#ifdef _DEBUG
+            printf("thread database closed\n");
+#endif
+            close(client_fd);
+            return -1;      //insert failed
+        }
+        data.data_len = 2;      //send trans success
+        send_cycle(client_fd, (char*)&data, sizeof(int));
+        mysql_close(conn);
+#ifdef _DEBUG
+        printf("database closed\n");
+#endif
+        return 0;
+    }
+
+    char path_name[RESULT_LEN] = "../netdisk/";
+    strcat(path_name, file_md5);
     int fd = open(path_name, O_CREAT|O_RDWR, 0666);
     if (fd == -1)
     {
@@ -156,24 +214,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         }
         else
         {
-            lseek(fd, 0, SEEK_SET);
-            compute_file_md5(fd, file_md5);
-            char new_pathname[RESULT_LEN] = "../netdisk/";
-            strcat(new_pathname, file_md5);
-            rename(path_name, new_pathname);
-
             //databse ops
-            MYSQL* conn;
-            ret = sql_connect(&conn);
-            if (ret == -1)
-            {
-                data.data_len = -1;
-                send_cycle(client_fd, (char*)&data, sizeof(int));
-                remove(path_name);
-                close(fd);
-                close(client_fd);
-                return -1;
-            }
             ret = sql_insert_file_trans(conn, user_name, cur_dir_id, 1, file_name, file_size, file_md5);
             if (ret)
             {
@@ -181,7 +222,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
                 send_cycle(client_fd, (char*)&data, sizeof(int));
                 mysql_close(conn);
 #ifdef _DEBUG
-                printf("database closed\n");
+                printf("thread database closed\n");
 #endif
                 remove(path_name);
                 close(fd);
@@ -192,7 +233,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
             send_cycle(client_fd, (char*)&data, sizeof(int));
             mysql_close(conn);
 #ifdef _DEBUG
-            printf("database closed\n");
+            printf("thread database closed\n");
 #endif
             close(fd);
             close(client_fd);

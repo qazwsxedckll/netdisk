@@ -114,7 +114,11 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
     char query[QUERY_LEN];
     MYSQL_RES* res;
     MYSQL_ROW row;
+    char file_path[RESULT_LEN];
 
+    printf("filename=%s\n",file_name);
+    char filename[RESULT_LEN];
+    sprintf(filename, "%s", file_name);
     res = sql_select(conn, "file", "id", dir_id, 0);
     if (res == NULL)
     {
@@ -122,18 +126,17 @@ int sql_insert_file(MYSQL* conn, const char* user_name, const char* dir_id, int 
     }
     row = mysql_fetch_row(res);
     mysql_free_result(res);
-    char file_path[RESULT_LEN];
-    sprintf(file_path, "%s/%s", row[5], file_name);
+    sprintf(file_path, "%s/%s", row[5], filename);
 
     if (type == 0)
     {
         sprintf(query, "INSERT INTO file VALUES (default, %s, %d, '%s', NULL, '%s', NULL, default)",
-                dir_id, type, file_name, file_path);
+                dir_id, type, filename, file_path);
     }
     else
     {
         sprintf(query, "INSERT INTO file VALUES (default, %s, %d, '%s', %d, '%s', '%s', default)",
-            dir_id, type, file_name, file_size, file_path, file_md5);
+            dir_id, type, filename, file_size, file_path, file_md5);
     }
 #ifdef _DEBUG
     printf("sql: %s\n", query);
@@ -197,7 +200,7 @@ int sql_insert_user_trans(MYSQL* conn, const char* user_name, const char* passwo
     }
 
     //insert into table file and user_file
-    ret =sql_insert_file(conn, user_name, dir_id, type, file_name, file_size, file_md5);
+    ret = sql_insert_file(conn, user_name, dir_id, type, file_name, file_size, file_md5);
     if (ret)
     {
         strcpy(query, "ROLLBACK");
@@ -236,7 +239,7 @@ int sql_insert_file_trans(MYSQL* conn, const char* user_name, const char* dir_id
     }
 
     //insert into table file and user_file
-    ret =sql_insert_file(conn, user_name,  dir_id, type, file_name, file_size, file_md5);
+    ret = sql_insert_file(conn, user_name, dir_id, type, file_name, file_size, file_md5);
     if (ret)
     {
         strcpy(query, "ROLLBACK");

@@ -24,7 +24,8 @@
 #define CMD_LEN 1000
 #define USER_LEN 20
 #define TOKEN_LEN 30
-#define FILE_NAME_LEN 101
+#define FILE_NAME_LEN 100
+#define MD5_LEN 150
 
 /*设置输出前景色*/
 #define PRINT_FONT_RED  printf("\033[31m") //红色

@@ -2,6 +2,7 @@
 #define __TRANSMISSION_H__
 #include "head.h"
 #include "client.h"
+#include "md5.h"
 
 int tran_cmd(int fd, DataPackage* data);
 
