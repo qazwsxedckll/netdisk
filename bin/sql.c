@@ -56,6 +56,9 @@ MYSQL_RES* sql_select(MYSQL* conn, const char* table, const char* field, const c
         res = mysql_store_result(conn);
         if (mysql_num_rows(res) == 0)
         {
+#ifdef _DEBUG
+        printf("sql: empty set\n");
+#endif
             mysql_free_result(res);
             return NULL;
         }

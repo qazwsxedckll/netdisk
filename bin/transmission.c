@@ -9,6 +9,12 @@ int send_cycle(int fd, const char* data, int send_len)
         ret = send(fd, data + total, send_len - total, 0);
         if (ret == -1)
         {
+            printf("transmission interrupted\n");
+            return -1;
+        }
+        if (ret == 0)
+        {
+            printf("transmission closed\n");
             return -1;
         }
         total = total + ret;
@@ -23,8 +29,14 @@ int recv_cycle(int fd, char* data, int recv_len)
     while (total < recv_len)
     {
         ret = recv(fd, data + total, recv_len - total, 0);
+        if (ret == -1)
+        {
+            printf("transmission interrupted\n");
+            return -1;
+        }
         if (ret == 0)
         {
+            printf("transmission closed\n");
             return -1;
         }
         total = total + ret;
@@ -39,8 +51,9 @@ int send_file(int client_fd, const char* file_name, const char* file_md5, const 
     data.data_len = strlen(file_name) + 1;
     strcpy(data.buf, file_name);
     ret = send_cycle(client_fd, (char*)&data, data.data_len + sizeof(int));      //send file name
-    if (ret == -1)
+    if (ret)
     {
+        close(client_fd);
         return -1;
     }
     char file_path[MD5_LEN] = "../netdisk/";
@@ -48,34 +61,44 @@ int send_file(int client_fd, const char* file_name, const char* file_md5, const 
     int fd = open(file_path, O_RDONLY);
     if (fd == -1)
     {
+#ifdef _DEBUG
+        printf("cannot open file\n");
+#endif
+        close(client_fd);
         return -2;
     }
     data.data_len = strlen(file_size) + 1;
     strcpy(data.buf, file_size);
     ret = send_cycle(client_fd, (char*)&data, data.data_len + sizeof(int));        //send file size
-    if (ret == -1)
+    if (ret)
     {
+        close(client_fd);
         close(fd);
         return -1;
     }
     while ((data.data_len = read(fd, data.buf, sizeof(data.buf))) > 0)
     {
         ret = send_cycle(client_fd, (char*)&data, data.data_len + sizeof(int));
-        if (ret == -1)
+        if (ret)
         {
+            close(client_fd);
             close(fd);
             return -1;
         }
     }
     data.data_len = 0;
     ret = send_cycle(client_fd, (char*)&data, sizeof(int));
-    if (ret == -1)
+    if (ret)
     {
+        close(client_fd);
         close(fd);
         return -1;
     }
     close(fd);
     close(client_fd);
+#ifdef _DEBUG
+    printf("transmission succeed\n");
+#endif
     return 0;
 }
 
@@ -91,20 +114,20 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     MYSQL_ROW row;
 
     ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv md5;
-    if (ret == -1)
+    if (ret)
     {
         close(client_fd);
         return -1;
     }
     ret = recv_cycle(client_fd, data.buf, data.data_len);
-    if (ret == -1)
+    if (ret)
     {
         close(client_fd);
         return -1;
     }
     strcpy(file_md5, data.buf);
     ret = sql_connect(&conn);
-    if (ret == -1)
+    if (ret)
     {
         data.data_len = -1;
         send_cycle(client_fd, (char*)&data, sizeof(int));
@@ -116,12 +139,24 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     {
         mysql_free_result(res);
         data.data_len = 0;
-        send_cycle(client_fd, (char*)&data, sizeof(int));
+        ret = send_cycle(client_fd, (char*)&data, sizeof(int));
+        if (ret)
+        {
+            mysql_close(conn);
+            close(client_fd);
+            return -1;
+        }
     }
     else            //file already exist
     {
         data.data_len = 1;
-        send_cycle(client_fd, (char*)&data, sizeof(int));
+        ret = send_cycle(client_fd, (char*)&data, sizeof(int));
+        if (ret)
+        {
+            mysql_close(conn);
+            close(client_fd);
+            return -1;
+        }
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         char file_name[RESULT_LEN];
@@ -130,16 +165,24 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         if (ret)
         {
             data.data_len = -1;
-            send_cycle(client_fd, (char*)&data, sizeof(int));
+            ret = send_cycle(client_fd, (char*)&data, sizeof(int));
             mysql_close(conn);
 #ifdef _DEBUG
             printf("thread database closed\n");
 #endif
+            mysql_close(conn);
             close(client_fd);
             return -1;      //insert failed
         }
         data.data_len = 2;      //send trans success
-        send_cycle(client_fd, (char*)&data, sizeof(int));
+        ret = send_cycle(client_fd, (char*)&data, sizeof(int));
+        if (ret)
+        {
+            mysql_close(conn);
+            close(client_fd);
+            return -1;
+        }
+        close(client_fd);
         mysql_close(conn);
 #ifdef _DEBUG
         printf("database closed\n");
@@ -152,13 +195,17 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     int fd = open(path_name, O_CREAT|O_RDWR, 0666);
     if (fd == -1)
     {
-        return -2;
+        perror("open");
+        close(client_fd);
+        mysql_close(conn);
+        return -1;
     }
 
     ret = recv_cycle(client_fd, (char*)&data.data_len, sizeof(int));      //recv filename;
     if (ret == -1)
     {
         remove(path_name);
+        mysql_close(conn);
         close(fd);
         close(client_fd);
         return -1;
@@ -167,6 +214,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     if (ret == -1)
     {
         remove(path_name);
+        mysql_close(conn);
         close(fd);
         close(client_fd);
         return -1;
@@ -180,6 +228,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     if (ret == -1)
     {
         remove(path_name);
+        mysql_close(conn);
         close(fd);
         close(client_fd);
         return -1;
@@ -188,6 +237,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
     if (ret == -1)
     {
         remove(path_name);
+        mysql_close(conn);
         close(fd);
         close(client_fd);
         return -1;
@@ -204,6 +254,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         if (ret == -1)
         {
             remove(path_name);
+            mysql_close(conn);
             close(fd);
             close(client_fd);
             return -1;
@@ -211,7 +262,24 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         if (data.data_len > 0)
         {
             recv_cycle(client_fd, data.buf, data.data_len);
-            write(fd, data.buf, data.data_len);
+            if (ret == -1)
+            {
+                remove(path_name);
+                mysql_close(conn);
+                close(fd);
+                close(client_fd);
+                return -1;
+            }
+            ret = write(fd, data.buf, data.data_len);
+            if (ret == -1)
+            {
+                perror("write");
+                remove(path_name);
+                mysql_close(conn);
+                close(fd);
+                close(client_fd);
+                return -1;
+            }
             transfered += data.data_len;
         }
         else
@@ -232,7 +300,15 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
                 return -1;      //insert failed
             }
             data.data_len = 0;
-            send_cycle(client_fd, (char*)&data, sizeof(int));
+            ret = send_cycle(client_fd, (char*)&data, sizeof(int));
+            if (ret)
+            {
+                remove(path_name);
+                mysql_close(conn);
+                close(fd);
+                close(client_fd);
+                return -1;
+            }
             mysql_close(conn);
 #ifdef _DEBUG
             printf("thread database closed\n");

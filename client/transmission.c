@@ -9,6 +9,12 @@ int send_cycle(int fd, const char* data, int send_len)
         ret = send(fd, data + total, send_len - total, 0);
         if (ret == -1)
         {
+            printf("transmission interrupted\n");
+            return -1;
+        }
+        if (ret == 0)
+        {
+            printf("transmission closed\n");
             return -1;
         }
         total = total + ret;
@@ -23,6 +29,16 @@ int recv_cycle(int fd, char* data, int recv_len)
     while (total < recv_len)
     {
         ret = recv(fd, data + total, recv_len - total, 0);
+        if (ret == -1)
+        {
+            printf("transmission interrupted\n");
+            return -1;
+        }
+        if (ret == 0)
+        {
+            printf("transmission closed\n");
+            return -1;
+        }
         total = total + ret;
     }
     return 0;
@@ -38,15 +54,10 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         system("clear");
         if (err == -1)
         {
-            printf("connection failed, try again later\n");
-            err = 0;
-        }
-        if (err == -2)
-        {
             printf("wrong invitation code\n");
             err = 0;
         }
-        if (err == -3)
+        if (err == -2)
         {
             printf("unknown error occured\n");
             err = 0;
@@ -69,17 +80,30 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
         //connect to server
         ret = connect_server(socketFd, ip, port);
-        if (ret == -1)
+        if (ret)
         {
-            err = -1;
+            continue;
         }
         data->data_len = 4;
-        send_cycle(*socketFd, (char*)data, sizeof(int));        //4 for invitation code
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //4 for invitation code
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, invi_code);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send code
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send code
+        if (ret)
+        {
+            continue;
+        }
 
-        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (ret)
+        {
+            continue;
+        }
+
         if (data->data_len == 0)
         {
             flag = 0;
@@ -87,12 +111,12 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
         else if (data->data_len == -1)
         {
-            err = -2;
+            err = -1;
             close(*socketFd);
         }
         else
         {
-            err = -3;
+            err = -2;
             close(*socketFd);
         }
     }
@@ -112,20 +136,15 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             //comfirm name
             if (err == -1)
             {
-                printf("connection failed, try again later\n");
+                printf("username already used\n");
                 err = 0;
             }
             if (err == -2)
             {
-                printf("username already used\n");
-                err = 0;
-            }
-            if (err == -3)
-            {
                 printf("unknown error occured\n");
                 err = 0;
             }
-            if (err == -4)
+            if (err == -3)
             {
                 printf("username too long!\n");
                 err = 0;
@@ -137,7 +156,7 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
                 ret = read(STDIN_FILENO, user_name, USER_LEN);
                 if (ret >= 20)
                 {
-                    err = -4;       //too long err
+                    err = -3;       //too long err
                     flag = -2;
                 }
                 else
@@ -158,17 +177,30 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
-        if (ret == -1)
+        if (ret)
         {
-            err = -1;
+            continue;
         }
         data->data_len = 5;
-        send_cycle(*socketFd, (char*)data, sizeof(int));        //5 for regi name
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //5 for regi name
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send username
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send username
+        if (ret)
+        {
+            continue;
+        }
 
-        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (ret)
+        {
+            continue;
+        }
+
         if (data->data_len == 0)
         {
             flag = 0;
@@ -176,12 +208,12 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
         else if (data->data_len == -1)
         {
-            err = -2;
+            err = -1;
             close(*socketFd);
         }
         else
         {
-            err = -3;
+            err = -2;
             close(*socketFd);
         }
     }
@@ -201,15 +233,10 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             printf("Enter username: %s\n", user_name);
             if (err == -1)
             {
-                printf("connection failed, try again later\n");
-                err = 0;
-            }
-            if (err == -2)
-            {
                 printf("unknown error occured\n");
                 err = 0;
             }
-            if (err == -3)
+            if (err == -2)
             {
                 printf("password too long!\n");
                 err = 0;
@@ -217,7 +244,7 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             password = getpass("Enter password: ");
             if (strlen(password) >= 20)
             {
-                err = -3;       //too long err
+                err = -2;       //too long err
                 flag = -2;
             }
             else
@@ -232,20 +259,37 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
-        if (ret == -1)
+        if (ret)
         {
-            err = -1;
+            continue;
         }
         data->data_len = 6;
-        send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, password);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+        if (ret)
+        {
+            continue;
+        }
 
-        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+        if (ret)
+        {
+            continue;
+        }
+
         if (data->data_len == 0)
         {
             flag = 0;
@@ -253,7 +297,7 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
         else if (data->data_len == -1)
         {
-            err = -2;
+            err = -1;
             close(*socketFd);
         }
     }
@@ -276,15 +320,10 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             system("clear");
             if (err == -1)
             {
-                printf("connection failed, try again later\n");
-                err = 0;
-            }
-            if (err == -2)
-            {
                 printf("username too long!\n");
                 err = 0;
             }
-            if (err == -3)
+            if (err == -2)
             {
                 printf("wrong username or password\n");
                 err = 0;
@@ -297,7 +336,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
                 ret = read(STDIN_FILENO, user_name, USER_LEN);
                 if (ret >= 20)
                 {
-                    err = -2;       //too long err
+                    err = -1;       //too long err
                     flag = -2;
                 }
                 else
@@ -348,29 +387,53 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
-        if (ret == -1)
+        if (ret)
         {
-            err = -1;
             continue;
         }
         data->data_len = 0;
-        send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+        if (ret)
+        {
+            continue;
+        }
         strcpy(data->buf, password);
         data->data_len = strlen(data->buf) + 1;
-        send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
-
-        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirm
-        if (data->data_len == -1)
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+        if (ret)
         {
-            err = -3;
             continue;
         }
 
-        recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
-        recv_cycle(*socketFd, data->buf, data->data_len);
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirm
+        if (ret)
+        {
+            continue;
+        }
+
+        if (data->data_len == -1)
+        {
+            err = -2;
+            continue;
+        }
+
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
+        if (ret)
+        {
+            continue;
+        }
+        ret = recv_cycle(*socketFd, data->buf, data->data_len);
+        if (ret)
+        {
+            continue;
+        }
         break;
     }
     return 0;
@@ -378,17 +441,26 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
 
 int tran_cmd(int socket_fd, DataPackage* data)
 {
+    int ret;
     send_cycle(socket_fd, (char*)data, data->data_len + 4);
     system("clear");
     printf("-----$ %s\n", data->buf);
     while (1)
     {
-        recv_cycle(socket_fd, (char*)&data->data_len, sizeof(int));
+        ret = recv_cycle(socket_fd, (char*)&data->data_len, sizeof(int));
+        if (ret)
+        {
+            break;
+        }
         if (data->data_len == 0)
         {
             break;
         }
-        recv_cycle(socket_fd, data->buf, data->data_len);
+        ret = recv_cycle(socket_fd, data->buf, data->data_len);
+        if (ret)
+        {
+            break;
+        }
         printf("%s\n", data->buf);
     }
     return 0;
@@ -398,31 +470,75 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
 {
     int ret;
     ret = connect_server(socketFd, trans_info->ip_address, trans_info->port);
-    if (ret == -1)
+    if (ret)
     {
         return -1;
     }
     data->data_len = code;
 
-    send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets 3 for puts
+    ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets 3 for puts
+    if (ret)
+    {
+        return -1;
+    }
     data->data_len = strlen(trans_info->token) + 1;
     strcpy(data->buf, trans_info->token);
-    send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send token
-    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
+    ret = send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send token
+    if (ret)
+    {
+        return -1;
+    }
+    ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
+    if (ret)
+    {
+        return -1;
+    }
     if (data->data_len == -1)
     {
+        printf("token verification failed\n");
         return -1;
     }
 
     data->data_len = strlen(trans_info->cmd) + 1;
     strcpy(data->buf, trans_info->cmd);
-    send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send command
-    recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
-    if (data->data_len == -1)
+    ret = send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send command
+    if (ret)
     {
         return -1;
     }
-
+    ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
+    if (ret)
+    {
+        return -1;
+    }
+    if (data->data_len == 1)
+    {
+        printf("transmission interrupted\n");
+        return -1;
+    }
+    if (data->data_len == 2)
+    {
+        return 0;
+    }
+    if (data->data_len == 3)
+    {
+        return 0;
+    }
+    if (data->data_len == -1)
+    {
+        printf("unknown error occurred\n");
+        return -1;
+    }
+    if (data->data_len == -2)
+    {
+        printf("gets: cannot get: No such file or directory\n");
+        return -1;
+    }
+    if (data->data_len == -3)
+    {
+        printf("puts: cannot put: File already exist\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -432,26 +548,53 @@ void* get_files(void* p)
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
     ret = thread_connect(&socketFd, &data, trans_info, 2);
-    if (ret == -1)
+    if (ret)
     {
         close(socketFd);
         pthread_exit(NULL);
     }
 
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
-    recv_cycle(socketFd, data.buf, data.data_len);
-    mkdir("./downloads", 0777);
+    ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
+    if (ret)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    ret =recv_cycle(socketFd, data.buf, data.data_len);
+    if (ret)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    ret = mkdir("./downloads", 0777);
+    if (ret)
+    {
+        printf("downloads folder already exist\n");
+    }
     char path_name[CMD_LEN] = "./downloads/";
     strcat(path_name, data.buf);
     int fd = open(path_name, O_CREAT|O_RDWR, 0666);
     if (fd == -1)
     {
+        printf("file creation failed\n");
         close(socketFd);
         pthread_exit(NULL);
     }
 
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv size
-    recv_cycle(socketFd, data.buf, data.data_len);
+    ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv size
+    if (ret)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    ret = recv_cycle(socketFd, data.buf, data.data_len);
+    if (ret)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
     off_t size = atoi(data.buf);
 
     int transfered = 0;
@@ -461,11 +604,31 @@ void* get_files(void* p)
     fflush(stdout);
     while (1)
     {
-        recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+        ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));
+        if (ret)
+        {
+            close(fd);
+            close(socketFd);
+            pthread_exit(NULL);
+        }
         if (data.data_len > 0)
         {
-            recv_cycle(socketFd, data.buf, data.data_len);
-            write(fd, data.buf, data.data_len);
+            ret = recv_cycle(socketFd, data.buf, data.data_len);
+            if (ret)
+            {
+                printf("transmission interrupted\n");
+                close(fd);
+                close(socketFd);
+                pthread_exit(NULL);
+            }
+            ret = write(fd, data.buf, data.data_len);
+            if (ret)
+            {
+                printf("transmission interrupted\n");
+                close(fd);
+                close(socketFd);
+                pthread_exit(NULL);
+            }
             transfered += data.data_len;
             end = time(NULL);
             if (end - start >= 3)
@@ -493,7 +656,7 @@ void* put_files(void* p)
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
     ret = thread_connect(&socketFd, &data, trans_info, 3);
-    if (ret == -1)
+    if (ret)
     {
         close(socketFd);
         pthread_exit(NULL);
@@ -511,6 +674,7 @@ void* put_files(void* p)
     int fd = open(file_path, O_RDONLY);
     if (fd == -1)
     {
+        printf("file not exist\n");
         close(socketFd);
         pthread_exit(NULL);
     }
@@ -519,21 +683,40 @@ void* put_files(void* p)
     printf("\ruploading...   0.0%%");
     fflush(stdout);
     char file_md5[MD5_LEN] = {0};
-    compute_file_md5(fd, file_md5);
+    ret = compute_file_md5(fd, file_md5);
+    if(ret)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
     strcpy(data.buf, file_md5);
     data.data_len = strlen(data.buf) + 1;
     ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
-    if (ret == -1)
+    if (ret)
     {
         close(fd);
         close(socketFd);
         pthread_exit(NULL);
     }
 
-    recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv md5 confirm
-    recv_cycle(socketFd, data.buf, data.data_len);
+    ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv md5 confirm
+    if (ret)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    ret = recv_cycle(socketFd, data.buf, data.data_len);
+    if (ret)
+    {
+        close(fd);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
     if (data.data_len == -1)        //server cannot connect database
     {
+        printf("transmission interrupted\n");
         close(fd);
         close(socketFd);
         pthread_exit(NULL);
@@ -568,7 +751,7 @@ void* put_files(void* p)
     data.data_len = strlen(file_name) + 1;
     strcpy(data.buf, file_name);
     ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
-    if (ret == -1)
+    if (ret)
     {
         close(fd);
         close(socketFd);
@@ -578,8 +761,9 @@ void* put_files(void* p)
     //send file size
     struct stat buf;
     ret = fstat(fd, &buf);
-    if (ret == -1)
+    if (ret)
     {
+        perror("fstat");
         close(fd);
         close(socketFd);
         pthread_exit(NULL);
@@ -587,8 +771,8 @@ void* put_files(void* p)
     off_t file_size = buf.st_size;
     sprintf(data.buf, "%ld", file_size);
     data.data_len = strlen(data.buf) + 1;
-    send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
-    if (ret == -1)
+    ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
+    if (ret)
     {
         close(fd);
         close(socketFd);
@@ -623,7 +807,7 @@ void* put_files(void* p)
     //send end of transmission
     data.data_len = 0;
     ret = send_cycle(socketFd, (char*)&data, sizeof(int));
-    if (ret == -1)
+    if (ret)
     {
         close(fd);
         close(socketFd);
