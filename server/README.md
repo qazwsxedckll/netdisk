@@ -4,7 +4,7 @@
 
 服务器编译
 
-/bin
+/server
 
 make
 
@@ -12,7 +12,7 @@ make
 
 1. 修改server.conf里ip地址为本机地址
 2. 修改sql.conf里user和password为自己数据库的
-3. 执行./a.out ../conf/server.conf
+3. 执行./server ../conf/server.conf
 
 ---------
 
@@ -20,11 +20,11 @@ make
 
 /client
 
-gcc *.c -lpthread
+make
 
 执行
 
-./a.out [服务器ip] [服务器port] 
+./client <服务器ip> <服务器port> 
 
 ----------
 
