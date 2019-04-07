@@ -1,4 +1,4 @@
-#include "transmission.h"
+#include "../include/transmission.h"
 
 int send_cycle(int fd, const char* data, int send_len)
 {
@@ -44,11 +44,79 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
+int send_nonce(int fd, DataPackage* data)
+{
+    int ret;
+    char nonce[15];
+    srand((unsigned)(time(NULL)));
+    sprintf(nonce, "%d", rand());
+    strcpy(data->buf, nonce);
+    data->data_len = strlen(data->buf) + 1;
+    ret = send_cycle(fd, (char*)data, data->data_len + sizeof(int));   //send nonce
+    if (ret)
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))        //recv nonce
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, data->buf, data->data_len))
+    {
+        return -1;
+    }
+    char* nonce_tmp;
+    nonce_tmp = rsa_verify(data->buf);         //verify
+    if (nonce_tmp == NULL)
+    {
+        return -1;
+    }
+    if (strcmp(nonce_tmp, nonce) != 0)
+    {
+        free(nonce_tmp);
+        nonce_tmp = NULL;
+        printf("nonce verification failed\n");
+        return -1;
+    }
+    free(nonce_tmp);
+    nonce_tmp = NULL;
+
+    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))        //recv nonce
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, data->buf, data->data_len))
+    {
+        return -1;
+    }
+    nonce_tmp = rsa_sign(data->buf);
+    if (nonce_tmp == NULL)
+    {
+        return -1;
+    }
+    memcpy(data->buf, nonce_tmp, RSA_EN_LEN);
+    free(nonce_tmp);
+    nonce_tmp = NULL;
+    data->data_len = RSA_EN_LEN;
+    if (send_cycle(fd, (char*)data, data->data_len + sizeof(int)))
+    {
+        return -1;
+    }
+    return 0;
+}
+
 int user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
 {
     int ret;
     int flag = -1, err = 0;
     char invi_code[5];
+
+    ret = rsa_generate_key();
+    if (ret)
+    {
+        return -1;
+    }
+
     while (flag == -1)
     {
         system("clear");
@@ -90,6 +158,7 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         {
             continue;
         }
+
         strcpy(data->buf, invi_code);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send code
@@ -261,33 +330,69 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         ret = connect_server(socketFd, ip, port);
         if (ret)
         {
-            continue;
+            close(*socketFd);
+            return -1;
         }
         data->data_len = 6;
         ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
         if (ret)
         {
-            continue;
+            close(*socketFd);
+            return -1;
         }
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
         if (ret)
         {
-            continue;
+            close(*socketFd);
+            return -1;
         }
         strcpy(data->buf, password);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
         if (ret)
         {
-            continue;
+            close(*socketFd);
+            return -1;
         }
 
+        //send pk
+        int pkfd = open("client_rsa_pub.key", O_RDONLY);
+        if (pkfd == -1)
+        {
+            perror("open");
+            close(*socketFd);
+            return -1;
+        }
+        while ((data->data_len = read(pkfd, data->buf, sizeof(data->buf))) > 0)
+        {
+            printf("datalen=%d\n", data->data_len);
+            sleep(1);
+            ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
+            if (ret == -1)
+            {
+                close(pkfd);
+                return -1;
+            }
+        }
+        close(pkfd);
+
+        //send end of transmission
+        data->data_len = 0;
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));
+        if (ret)
+        {
+            close(*socketFd);
+            return -1;
+        }
+
+        sleep(10);
         ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
         if (ret)
         {
-            continue;
+            close(*socketFd);
+            return -1;
         }
 
         if (data->data_len == 0)
@@ -326,6 +431,11 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             if (err == -2)
             {
                 printf("wrong username or password\n");
+                err = 0;
+            }
+            if (err == -3)
+            {
+                printf("nonce verification failed\n");
                 err = 0;
             }
             printf("Enter '0' to go back\n");
@@ -391,35 +501,51 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         {
             continue;
         }
+
         data->data_len = 0;
         ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //0 for login
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
+
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
+
+        ret = send_nonce(*socketFd, data);
+        if (ret)
+        {
+            close(*socketFd);
+            err = -3;
+            continue;
+        }
+
         strcpy(data->buf, password);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
 
         ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirm
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
 
         if (data->data_len == -1)
         {
+            close(*socketFd);
             err = -2;
             continue;
         }
@@ -427,11 +553,13 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
         ret = recv_cycle(*socketFd, data->buf, data->data_len);
         if (ret)
         {
+            close(*socketFd);
             continue;
         }
         break;

@@ -1,6 +1,6 @@
-#include "head.h"
-#include "transmission.h"
-#include "client.h"
+#include "../include/head.h"
+#include "../include/transmission.h"
+#include "../include/client.h"
 
 int main(int argc, char** argv)
 {
@@ -40,9 +40,10 @@ int main(int argc, char** argv)
         }
         else if (ret == '2')
         {
-            user_signup(&socketFd, argv[1], argv[2], user_name, &data);
+            ret = user_signup(&socketFd, argv[1], argv[2], user_name, &data);
             if (ret == -1)
             {
+                regi_flag = -1;
                 continue;
             }
             regi_flag = 1;

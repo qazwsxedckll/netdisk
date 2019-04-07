@@ -32,7 +32,3 @@ gcc *.c -lpthread
 
 mysql -u<username> -p<password> <dbname> < /netdisk.sql
                                       
-测试用户
-
-1. username: Evilolipop, password: 123
-2. username: Luke, password: luke

@@ -56,3 +56,6 @@ netdisk/
 core
 !client.exe
 client/downloads
+server_rsa.key
+client_rsa.key
+client_rsa_pub.key
