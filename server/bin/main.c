@@ -85,9 +85,9 @@ int main(int argc, char** argv)
                     new_fd = accept(socketFd, NULL, NULL);
 #ifdef _DEBUG
                     printf("incoming connection\n");
-#endif                                                                      //get connection code 0 for login, 2 for gets, 3 for puts
+#endif
                     if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //4 for invitation code, 5 for regi name, 6 for password
-                    {
+                    {                                                           //get connection code 0 for login, 2 for gets, 3 for puts
                         close(new_fd);
                         continue;
                     }
@@ -105,6 +105,13 @@ int main(int argc, char** argv)
                             continue;
                         }
                         strcpy(user_name, data.buf);
+
+                        if (recv_nonce(new_fd, &data, user_name))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get password
                         {
                             close(new_fd);
@@ -384,7 +391,7 @@ int main(int argc, char** argv)
 
                     if (data.data_len == 6)
                     {
-#ifdef _debug
+#ifdef _DEBUG
                         printf("connection for regi password\n");
 #endif
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get username
@@ -408,15 +415,65 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
+                        char password[USER_PWD_LEN];
+                        strcpy(password, data.buf);
 
-                        ret = sql_insert_user_trans(conn, user_name, data.buf, "1", 0, user_name, 0, "");
+                        //recv pk
+                        char pk_path[RESULT_LEN];
+                        sprintf(pk_path, "keys/%s_%s.key", user_name, "pub");
+                        int pkfd = open(pk_path, O_TRUNC|O_CREAT|O_RDWR, 0660);
+                        if (pkfd == -1)
+                        {
+                            perror("open");
+                            close(new_fd);
+                            continue;
+                        }
+                        int flag = 0;
+                        while (1)
+                        {
+                            ret = recv_cycle(new_fd, (char*)&data.data_len, sizeof(int));
+                            if (ret == -1)
+                            {
+                                flag = -1;
+                                break;
+                            }
+                            if (data.data_len > 0)
+                            {
+                                recv_cycle(new_fd, data.buf, data.data_len);
+                                if (ret == -1)
+                                {
+                                    flag = -1;
+                                    break;
+                                }
+                                ret = write(pkfd, data.buf, data.data_len);
+                                if (ret == -1)
+                                {
+                                    perror("write");
+                                    flag = -1;
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        if (flag == -1)
+                        {
+                            remove(pk_path);
+                            close(pkfd);
+                            close(new_fd);
+                            continue;
+                        }
+
+                        ret = sql_insert_user_trans(conn, user_name, password, "1", 0, user_name, 0, "");
                         if (ret == -1)
                         {
                             data.data_len = -1;
                         }
                         else if (ret == 0)
                         {
-#ifdef _debug
+#ifdef _DEBUG
                             printf("user created\n");
 #endif
                             data.data_len = 0;

@@ -3,6 +3,7 @@
 #include "head.h"
 #include "md5.h"
 #include "sql.h"
+#include "crypto.h"
 
 typedef struct
 {
@@ -13,6 +14,8 @@ typedef struct
 int send_cycle(int fd, const char* data, int send_len);
 
 int recv_cycle(int fd, char* data, int recv_len);
+
+int recv_nonce(int fd, DataPackage* data, char* user_name);
 
 int send_file(int client_fd, const char* file_name, const char* file_md5, const char* file_size);
 

@@ -3,6 +3,7 @@
 #include "head.h"
 #include "client.h"
 #include "md5.h"
+#include "crypto.h"
 
 int tran_cmd(int fd, DataPackage* data);
 

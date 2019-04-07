@@ -44,6 +44,67 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
+int recv_nonce(int fd, DataPackage* data, char* user_name)
+{
+    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int))) //get nonce
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, data->buf, data->data_len))
+    {
+        return -1;
+    }
+    char* nonce_tmp;
+    nonce_tmp = rsa_sign(data->buf);
+    if (nonce_tmp == NULL)
+    {
+        return -1;
+    }
+    memcpy(data->buf, nonce_tmp, RSA_EN_LEN);  //sign
+    free(nonce_tmp);
+    nonce_tmp = NULL;
+    data->data_len = RSA_EN_LEN;
+    if (send_cycle(fd, (char*)data, data->data_len + sizeof(int))) //send back
+    {
+        return -1;
+    }
+
+    int ret;
+    char nonce[15];
+    srand((unsigned)(time(NULL)));
+    sprintf(nonce, "%d", rand());
+    strcpy(data->buf, nonce);
+    data->data_len = strlen(data->buf) + 1;
+    ret = send_cycle(fd, (char*)data, data->data_len + sizeof(int));
+    if (ret)
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, data->buf, data->data_len))
+    {
+        return -1;
+    }
+    nonce_tmp = rsa_verify(data->buf, user_name);
+    if (nonce_tmp == NULL)
+    {
+        return -1;
+    }
+    if (strcmp(nonce_tmp, nonce) != 0)
+    {
+        free(nonce_tmp);
+        nonce_tmp =NULL;
+        printf("nonce verification failed\n");
+        return -1;
+    }
+    free(nonce_tmp);
+    nonce_tmp = NULL;
+    return 0;
+}
+
 int send_file(int client_fd, const char* file_name, const char* file_md5, const char* file_size)
 {
     int ret;

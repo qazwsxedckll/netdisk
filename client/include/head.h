@@ -19,15 +19,30 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/epoll.h>
-#include <mysql/mysql.h>
-#include <assert.h>
+#include <openssl/rsa.h>
+#include <openssl/pem.h>
+#include <openssl/err.h>
 
 #define _DEBUG
-#define RESULT_LEN 1000
-#define INT_LEN 12
+#define CMD_LEN 1000
+#define USER_LEN 20
 #define TOKEN_LEN 30
-#define MD5_LEN 150
 #define FILE_NAME_LEN 100
+#define MD5_LEN 150
+#define RSA_EN_LEN 256
+#define RSA_DE_LEN 245
 
+/*设置输出前景色*/
+#define PRINT_FONT_RED  printf("\033[31m") //红色
+#define PRINT_FONT_CYA  printf("\033[36m") //青色
+#define PRINT_FONT_WHI  printf("\033[37m") //白色
+
+typedef struct
+{
+    char ip_address[20];
+    char port[6];
+    char token[TOKEN_LEN];
+    char cmd[CMD_LEN];
+}TransInfo;
 #endif
 

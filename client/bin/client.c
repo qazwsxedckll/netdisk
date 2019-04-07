@@ -1,4 +1,4 @@
-#include "client.h"
+#include "../include/client.h"
 
 int connect_server(int* socketFd, const char* ip, const char* port)
 {
@@ -20,9 +20,13 @@ int connect_server(int* socketFd, const char* ip, const char* port)
 int login_page(int flag)
 {
     system("clear");
-    if (flag)
+    if (flag == 1)
     {
         printf("register success\n");
+    }
+    else if (flag == -1)
+    {
+        printf("register failed\n");
     }
     printf("Please enter a num to continue... \n");
     printf("1.\tLogin\n");

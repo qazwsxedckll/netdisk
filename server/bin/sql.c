@@ -4,7 +4,7 @@
 int sql_connect(MYSQL** conn)
 {
     Config configs[50];
-    int n = read_conf("../conf/sql.conf", configs);
+    int n = read_conf("conf/sql.conf", configs);
     char server[CONFIG_LEN];
     char user[CONFIG_LEN];
     char password[CONFIG_LEN];
