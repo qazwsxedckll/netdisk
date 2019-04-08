@@ -12,7 +12,6 @@ typedef struct
     char user_name[USER_NAME_LEN + 1];
     char cur_dir_id[RESULT_LEN];
     char root_id[RESULT_LEN];
-    char token[TOKEN_LEN];
 }User, *Users;
 
 int user_verify(MYSQL* conn, const char* user_name, const char* password);

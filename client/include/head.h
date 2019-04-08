@@ -26,7 +26,6 @@
 #define _DEBUG
 #define CMD_LEN 1000
 #define USER_LEN 20
-#define TOKEN_LEN 30
 #define FILE_NAME_LEN 100
 #define MD5_LEN 150
 #define RSA_EN_LEN 256
@@ -39,9 +38,9 @@
 
 typedef struct
 {
+    char user_name[USER_LEN];
     char ip_address[20];
     char port[6];
-    char token[TOKEN_LEN];
     char cmd[CMD_LEN];
 }TransInfo;
 #endif

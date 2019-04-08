@@ -440,6 +440,7 @@ int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user
 #endif
             return 3;
         }
+        return 3;
     }
 }
 

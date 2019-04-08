@@ -35,7 +35,7 @@ int main(int argc, char** argv)
             {
                 continue;
             }
-            strcpy(trans_info.token, data.buf);
+            strcpy(trans_info.user_name, user_name);
             break;
         }
         else if (ret == '2')

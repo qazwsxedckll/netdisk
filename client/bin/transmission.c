@@ -581,19 +581,6 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             err = -2;
             continue;
         }
-
-        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv token
-        if (ret)
-        {
-            close(*socketFd);
-            continue;
-        }
-        ret = recv_cycle(*socketFd, data->buf, data->data_len);
-        if (ret)
-        {
-            close(*socketFd);
-            continue;
-        }
         break;
     }
     return 0;
@@ -641,13 +628,20 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     {
         return -1;
     }
-    data->data_len = strlen(trans_info->token) + 1;
-    strcpy(data->buf, trans_info->token);
-    ret = send_cycle(*socketFd, (char*)data, sizeof(int) + data->data_len);//send token
+
+    strcpy(data->buf, trans_info->user_name);
+    data->data_len = strlen(data->buf) + 1;
+    ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int)); //send username and nonce
     if (ret)
     {
         return -1;
     }
+    ret = send_nonce(*socketFd, data);
+    if (ret)
+    {
+        return -1;
+    }
+
     ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));
     if (ret)
     {
@@ -655,7 +649,7 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     }
     if (data->data_len == -1)
     {
-        printf("token verification failed\n");
+        printf("verification failed\n");
         return -1;
     }
 
@@ -671,23 +665,9 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     {
         return -1;
     }
-    if (data->data_len == 1)
-    {
-        printf("transmission interrupted\n");
-        return -1;
-    }
-    if (data->data_len == 2)
+    if (data->data_len == 0)
     {
         return 0;
-    }
-    if (data->data_len == 3)
-    {
-        return 0;
-    }
-    if (data->data_len == -1)
-    {
-        printf("unknown error occurred\n");
-        return -1;
     }
     if (data->data_len == -2)
     {
