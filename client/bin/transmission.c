@@ -357,6 +357,40 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             return -1;
         }
 
+        char nonce[15];
+        srand((unsigned)(time(NULL)));
+        sprintf(nonce, "%d", rand());
+        strcpy(data->buf, nonce);
+        data->data_len = strlen(data->buf) + 1;
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send nonce
+        if (ret)
+        {
+            return -1;
+        }
+        if (recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int)))        //recv nonce
+        {
+            return -1;
+        }
+        if (recv_cycle(*socketFd, data->buf, data->data_len))
+        {
+            return -1;
+        }
+        char* nonce_tmp;
+        nonce_tmp = rsa_verify(data->buf);         //verify
+        if (nonce_tmp == NULL)
+        {
+            return -1;
+        }
+        if (strcmp(nonce_tmp, nonce) != 0)
+        {
+            free(nonce_tmp);
+            nonce_tmp = NULL;
+            printf("nonce verification failed\n");
+            return -1;
+        }
+        free(nonce_tmp);
+        nonce_tmp = NULL;
+
         //send pk
         int pkfd = open("client_rsa_pub.key", O_RDONLY);
         if (pkfd == -1)
@@ -367,8 +401,6 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
         while ((data->data_len = read(pkfd, data->buf, sizeof(data->buf))) > 0)
         {
-            printf("datalen=%d\n", data->data_len);
-            sleep(1);
             ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
             if (ret == -1)
             {
@@ -694,14 +726,10 @@ void* get_files(void* p)
         close(socketFd);
         pthread_exit(NULL);
     }
-    ret = mkdir("./downloads", 0777);
-    if (ret)
-    {
-        printf("downloads folder already exist\n");
-    }
-    char path_name[CMD_LEN] = "./downloads/";
+    ret = mkdir("downloads", 0775);
+    char path_name[CMD_LEN] = "downloads/";
     strcat(path_name, data.buf);
-    int fd = open(path_name, O_CREAT|O_RDWR, 0666);
+    int fd = open(path_name, O_WRONLY|O_TRUNC|O_CREAT, 0664);
     if (fd == -1)
     {
         printf("file creation failed\n");
@@ -750,8 +778,9 @@ void* get_files(void* p)
                 pthread_exit(NULL);
             }
             ret = write(fd, data.buf, data.data_len);
-            if (ret)
+            if (ret == -1)
             {
+                perror("write");
                 printf("transmission interrupted\n");
                 close(fd);
                 close(socketFd);

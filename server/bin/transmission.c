@@ -117,7 +117,7 @@ int send_file(int client_fd, const char* file_name, const char* file_md5, const 
         close(client_fd);
         return -1;
     }
-    char file_path[MD5_LEN] = "../netdisk/";
+    char file_path[MD5_LEN] = "netdisk/";
     strcat(file_path, file_md5);
     int fd = open(file_path, O_RDONLY);
     if (fd == -1)
@@ -251,7 +251,7 @@ int recv_file(int client_fd, const char* user_name, const char* cur_dir_id)
         return 0;
     }
 
-    char path_name[RESULT_LEN] = "../netdisk/";
+    char path_name[RESULT_LEN] = "netdisk/";
     strcat(path_name, file_md5);
     int fd = open(path_name, O_CREAT|O_RDWR, 0666);
     if (fd == -1)

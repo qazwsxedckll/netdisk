@@ -418,6 +418,30 @@ int main(int argc, char** argv)
                         char password[USER_PWD_LEN];
                         strcpy(password, data.buf);
 
+                        //recv nonce
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get nonce
+                        {
+                            return -1;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            return -1;
+                        }
+                        char* nonce_tmp;
+                        nonce_tmp = rsa_sign(data.buf);
+                        if (nonce_tmp == NULL)
+                        {
+                            return -1;
+                        }
+                        memcpy(data.buf, nonce_tmp, RSA_EN_LEN);  //sign
+                        free(nonce_tmp);
+                        nonce_tmp = NULL;
+                        data.data_len = RSA_EN_LEN;
+                        if (send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int))) //send back
+                        {
+                            return -1;
+                        }
+
                         //recv pk
                         char pk_path[RESULT_LEN];
                         sprintf(pk_path, "keys/%s_%s.key", user_name, "pub");
