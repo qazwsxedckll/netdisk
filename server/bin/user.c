@@ -14,7 +14,16 @@ int user_verify(MYSQL* conn, const char* user_name, const char* password)
     }
     mysql_free_result(res);
     row = mysql_fetch_row(res);
-    if (strcmp(password, row[2]) == 0)
+    unsigned char md[SHA512_DIGEST_LENGTH];
+    SHA512((unsigned char*)password, strlen(password), md);
+    char sha_password[SHA512_DIGEST_LENGTH * 2 + 1] = { 0 };
+    char tmp[3] = { 0 };
+    for (int i = 0; i < SHA512_DIGEST_LENGTH; i++)
+    {
+        sprintf(tmp, "%02x", md[i]);
+        strcat(sha_password, tmp);
+    }
+    if (strcmp(sha_password, row[2]) == 0)
     {
 #ifdef _DEBUG
         printf("verification success\n");

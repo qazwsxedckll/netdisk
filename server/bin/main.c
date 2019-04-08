@@ -181,6 +181,7 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
+                        strcpy(user_name, data.buf);
 
                         if (recv_nonce(new_fd, &data, user_name))
                         {
@@ -211,51 +212,58 @@ int main(int argc, char** argv)
                         }
                         cmd_interpret(data.buf, prefix, cmd_path);
                         pNode_t pnew = (pNode_t)calloc(1, sizeof(Node_t));
-                        if (strcmp(prefix, "gets") == 0)
+                        for (j = 0; j < max_client; j++)
                         {
-                            ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
-                            if (ret)
+                            if (strcmp(users[j].user_name, user_name) == 0)
                             {
-                                data.data_len = -2;
-                                send_cycle(new_fd, (char*)&data, sizeof(int));      //send file not exist
-                                close(new_fd);
-                                free(pnew);
-                                pnew = NULL;
-                                continue;
-                            }
-                            pnew->new_fd = new_fd;
-                            pnew->code = 2;
-                            pthread_mutex_lock(&f.que.mutex);
-                            que_insert(&f.que, pnew);
-                            pthread_mutex_unlock(&f.que.mutex);
-                            pthread_cond_signal(&f.cond);
+                                if (strcmp(prefix, "gets") == 0)
+                                {
+                                    ret = resolve_gets(pnew->file_md5, pnew->file_name, pnew->file_size, cmd_path, conn, users[j].cur_dir_id, users[j].root_id);
+                                    if (ret)
+                                    {
+                                        data.data_len = -2;
+                                        send_cycle(new_fd, (char*)&data, sizeof(int));      //send file not exist
+                                        close(new_fd);
+                                        free(pnew);
+                                        pnew = NULL;
+                                        continue;
+                                    }
+                                    pnew->new_fd = new_fd;
+                                    pnew->code = 2;
+                                    pthread_mutex_lock(&f.que.mutex);
+                                    que_insert(&f.que, pnew);
+                                    pthread_mutex_unlock(&f.que.mutex);
+                                    pthread_cond_signal(&f.cond);
 #ifdef _DEBUG
-                            printf("start sending\n");
+                                    printf("start sending\n");
 #endif
-                        }
-                        else if (strcmp(prefix, "puts") == 0)
-                        {
-                            ret = resolve_puts(cmd_path, conn, users[j].root_id, users[j].cur_dir_id);
-                            if (ret)
-                            {
-                                data.data_len = -3;
-                                send_cycle(new_fd, (char*)&data, sizeof(int));      //send file already exsit
-                                close(new_fd);
-                                free(pnew);
-                                pnew = NULL;
-                                continue;
-                            }
-                            pnew->new_fd = new_fd;
-                            pnew->code = 3;
-                            strcpy(pnew->file_name, users[j].user_name);    //send username via file_name
-                            strcpy(pnew->file_size, users[j].cur_dir_id);                  //send cur_dir_id via file size
-                            pthread_mutex_lock(&f.que.mutex);
-                            que_insert(&f.que, pnew);
-                            pthread_mutex_unlock(&f.que.mutex);
-                            pthread_cond_signal(&f.cond);
+                                }
+                                else if (strcmp(prefix, "puts") == 0)
+                                {
+                                    ret = resolve_puts(cmd_path, conn, users[j].root_id, users[j].cur_dir_id);
+                                    if (ret)
+                                    {
+                                        data.data_len = -3;
+                                        send_cycle(new_fd, (char*)&data, sizeof(int));      //send file already exsit
+                                        close(new_fd);
+                                        free(pnew);
+                                        pnew = NULL;
+                                        continue;
+                                    }
+                                    pnew->new_fd = new_fd;
+                                    pnew->code = 3;
+                                    strcpy(pnew->file_name, users[j].user_name);    //send username via file_name
+                                    strcpy(pnew->file_size, users[j].cur_dir_id);                  //send cur_dir_id via file size
+                                    pthread_mutex_lock(&f.que.mutex);
+                                    que_insert(&f.que, pnew);
+                                    pthread_mutex_unlock(&f.que.mutex);
+                                    pthread_cond_signal(&f.cond);
 #ifdef _DEBUG
-                            printf("start receiving\n");
+                                    printf("start receiving\n");
 #endif
+                                }
+                            }
+                            break;
                         }
 
                         data.data_len = 0;
@@ -356,8 +364,15 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
-                        char password[USER_PWD_LEN];
-                        strcpy(password, data.buf);
+                        unsigned char md[SHA512_DIGEST_LENGTH];
+                        SHA512((unsigned char*)data.buf, strlen(data.buf), md);
+                        char password[SHA512_DIGEST_LENGTH * 2 + 1];
+                        char tmp[3] = { 0 };
+                        for (int k = 0; k < SHA512_DIGEST_LENGTH; k++)
+                        {
+                            sprintf(tmp, "%02x", md[i]);
+                            strcat(password, tmp);
+                        }
 
                         //recv nonce
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get nonce
