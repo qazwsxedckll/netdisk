@@ -366,13 +366,14 @@ int main(int argc, char** argv)
                         }
                         unsigned char md[SHA512_DIGEST_LENGTH];
                         SHA512((unsigned char*)data.buf, strlen(data.buf), md);
-                        char password[SHA512_DIGEST_LENGTH * 2 + 1];
+                        char password[SHA512_DIGEST_LENGTH * 2 + 1] = { 0 };
                         char tmp[3] = { 0 };
                         for (int k = 0; k < SHA512_DIGEST_LENGTH; k++)
                         {
-                            sprintf(tmp, "%02x", md[i]);
+                            sprintf(tmp, "%02x", md[k]);
                             strcat(password, tmp);
                         }
+                        printf("password=%s\n",password);
 
                         //recv nonce
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get nonce

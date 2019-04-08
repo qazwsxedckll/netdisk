@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
+#include <openssl/sha.h>
 
 #define _DEBUG
 #define RESULT_LEN 1000

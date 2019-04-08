@@ -419,7 +419,6 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             return -1;
         }
 
-        sleep(10);
         ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
         if (ret)
         {
