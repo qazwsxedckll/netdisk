@@ -71,7 +71,7 @@ char* rsa_encrypt(char* str)
 char* rsa_sign(char* str)
 {
     int ret;
-    char* en_str;;
+    char* en_str;
     FILE* fp;
 
     fp = fopen("client_rsa.key", "rb");
@@ -107,9 +107,44 @@ char* rsa_sign(char* str)
     RSA_free(rsa);
     return en_str;
 }
+
 char* rsa_decrypt(char* str)
 {
+    int ret;
+    char* de_str;
+    FILE* fp;
 
+    fp = fopen("client_rsa.key", "rb");
+    if (fp == NULL)
+    {
+        printf("client_rsa.key not found\n");
+        return NULL;
+    }
+
+    RSA* rsa;
+
+    rsa = PEM_read_RSAPrivateKey(fp, NULL, NULL, NULL);
+    if (rsa == NULL)
+    {
+        printf("rsa_private_key read failed\n");
+        fclose(fp);
+        RSA_free(rsa);
+        return NULL;
+    }
+
+    de_str = (char*)calloc(RSA_DE_LEN, sizeof(char));
+    ret = RSA_private_decrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
+    if (ret == -1)
+    {
+        printf("rsa sign failed\n");
+        fclose(fp);
+        RSA_free(rsa);
+        return NULL;
+    }
+
+    fclose(fp);
+    RSA_free(rsa);
+    return de_str;
 }
 
 char* rsa_verify(char* str)
@@ -133,7 +168,7 @@ char* rsa_verify(char* str)
         RSA_free(rsa);
         return NULL;
     }
-    
+
     de_str = (char*)calloc(RSA_DE_LEN, sizeof(char));
     ret = RSA_public_decrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
