@@ -30,6 +30,8 @@
 #define MD5_LEN 150
 #define RSA_EN_LEN 256
 #define RSA_DE_LEN 245
+#define SER_EN_LEN 384
+#define SER_DE_LEN 373
 
 /*设置输出前景色*/
 #define PRINT_FONT_RED  printf("\033[31m") //红色

@@ -445,6 +445,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
     int flag, ret, err;
     flag = -1;
     err = 0;
+    char* password;
 
     while (flag == -1)
     {
@@ -493,11 +494,12 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         user_name[ret - 1] = '\0';
         if (strcmp(user_name, "0") == 0)
         {
+            free(password);
+            password = NULL;
             return -1;
         }
 
         //input password
-        char* password;
         flag = -2;
         while (flag == -2)
         {
@@ -523,6 +525,8 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         }
         if (strcmp(password, "0") == 0)
         {
+            free(password);
+            password = NULL;
             return -1;
         }
 
@@ -550,7 +554,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        ret = send_nonce(*socketFd, data);
+        ret = send_nonce(*socketFd, data);          //send nonce
         if (ret)
         {
             close(*socketFd);
@@ -558,8 +562,26 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        strcpy(data->buf, password);
-        data->data_len = strlen(data->buf) + 1;
+        char* s_pass = rsa_sign(password);
+        free(password);
+        password = NULL;
+        if (s_pass == NULL)
+        {
+            close(*socketFd);
+            continue;
+        }
+        char *en_pass = rsa_encrypt(s_pass);
+        free(s_pass);
+        s_pass = NULL;
+        if (en_pass == NULL)
+        {
+            close(*socketFd);
+            continue;
+        }
+        memcpy(data->buf, en_pass, SER_EN_LEN);
+        free(en_pass);
+        en_pass = NULL;
+        data->data_len = SER_EN_LEN;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
         if (ret)
         {

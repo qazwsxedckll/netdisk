@@ -60,10 +60,10 @@ int recv_nonce(int fd, DataPackage* data, char* user_name)
     {
         return -1;
     }
-    memcpy(data->buf, nonce_tmp, RSA_EN_LEN);  //sign
+    memcpy(data->buf, nonce_tmp, SER_EN_LEN);  //sign
     free(nonce_tmp);
     nonce_tmp = NULL;
-    data->data_len = RSA_EN_LEN;
+    data->data_len = SER_EN_LEN;
     if (send_cycle(fd, (char*)data, data->data_len + sizeof(int))) //send back
     {
         return -1;

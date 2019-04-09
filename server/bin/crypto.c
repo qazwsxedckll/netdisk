@@ -74,7 +74,7 @@ char* rsa_sign(char* str)
     }
 
     int len = strlen(str);
-    en_str = (char*)calloc(RSA_EN_LEN, sizeof(char));
+    en_str = (char*)calloc(SER_EN_LEN, sizeof(char));
     ret = RSA_private_encrypt(len, (unsigned char*)str, (unsigned char*)en_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
     {
@@ -116,11 +116,14 @@ char* rsa_decrypt(char* str)
         RSA_free(rsa);
         return NULL;
     }
-    de_str = (char*)calloc(RSA_DE_LEN, sizeof(char));
-    ret = RSA_private_decrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
+    de_str = (char*)calloc(SER_DE_LEN, sizeof(char));
+    ret = RSA_private_decrypt(SER_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
     {
+#ifdef _DEBUG
+        ERR_print_errors_fp(stdout);
         printf("rsa_decrypt failed\n");
+#endif
         fclose(fp);
         RSA_free(rsa);
         return NULL;
@@ -163,6 +166,7 @@ char* rsa_verify(char* str, char* user_name)
     if (ret == -1)
     {
 #ifdef _DEBUG
+        ERR_print_errors_fp(stdout);
         printf("decryption failed\n");
 #endif
         fclose(fp);

@@ -24,6 +24,7 @@
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
+#include <openssl/err.h>
 
 #define _DEBUG
 #define RESULT_LEN 1000
@@ -32,6 +33,8 @@
 #define FILE_NAME_LEN 100
 #define RSA_EN_LEN 256
 #define RSA_DE_LEN 245
+#define SER_EN_LEN 384
+#define SER_DE_LEN 373
 
 #endif
 

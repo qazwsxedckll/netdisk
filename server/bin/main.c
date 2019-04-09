@@ -120,11 +120,30 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
+
+                        char* de_pass = rsa_decrypt(data.buf);
+                        if (de_pass == NULL)
+                        {
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                        char* v_pass = rsa_verify(de_pass, user_name);
+                        free(de_pass);
+                        de_pass = NULL;
+                        if (v_pass == NULL)
+                        {
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
 #ifdef _DEBUG
                         printf("username: %s\n", user_name);
-                        printf("password: %s\n", data.buf);
+                        printf("password: %s\n", v_pass);
 #endif
-                        ret = user_verify(conn, user_name, data.buf);
+                        ret = user_verify(conn, user_name, v_pass);
                         if (ret)
                         {
                             data.data_len = -1;

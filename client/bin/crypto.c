@@ -52,9 +52,8 @@ char* rsa_encrypt(char* str)
         return NULL;
     }
 
-    int len = strlen(str);
-    en_str = (char*)calloc(256, sizeof(char));
-    ret = RSA_public_encrypt(len, (unsigned char*)str, (unsigned char*)en_str, rsa, RSA_PKCS1_PADDING);
+    en_str = (char*)calloc(SER_EN_LEN, sizeof(char));
+    ret = RSA_public_encrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)en_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
     {
         printf("rsa_encrypt failed\n");
@@ -169,8 +168,8 @@ char* rsa_verify(char* str)
         return NULL;
     }
 
-    de_str = (char*)calloc(RSA_DE_LEN, sizeof(char));
-    ret = RSA_public_decrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
+    de_str = (char*)calloc(SER_DE_LEN, sizeof(char));
+    ret = RSA_public_decrypt(SER_EN_LEN, (unsigned char*)str, (unsigned char*)de_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
     {
         printf("decrption failed\n");
