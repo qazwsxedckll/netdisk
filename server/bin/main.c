@@ -373,26 +373,6 @@ int main(int argc, char** argv)
                             continue;
                         }
                         strcpy(user_name, data.buf);
-                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get password
-                        {
-                            close(new_fd);
-                            continue;
-                        }
-                        if (recv_cycle(new_fd, data.buf, data.data_len))
-                        {
-                            close(new_fd);
-                            continue;
-                        }
-                        unsigned char md[SHA512_DIGEST_LENGTH];
-                        SHA512((unsigned char*)data.buf, strlen(data.buf), md);
-                        char password[SHA512_DIGEST_LENGTH * 2 + 1] = { 0 };
-                        char tmp[3] = { 0 };
-                        for (int k = 0; k < SHA512_DIGEST_LENGTH; k++)
-                        {
-                            sprintf(tmp, "%02x", md[k]);
-                            strcat(password, tmp);
-                        }
-                        printf("password=%s\n",password);
 
                         //recv nonce
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get nonce
@@ -409,10 +389,10 @@ int main(int argc, char** argv)
                         {
                             return -1;
                         }
-                        memcpy(data.buf, nonce_tmp, RSA_EN_LEN);  //sign
+                        memcpy(data.buf, nonce_tmp, SER_EN_LEN);  //sign
                         free(nonce_tmp);
                         nonce_tmp = NULL;
-                        data.data_len = RSA_EN_LEN;
+                        data.data_len = SER_EN_LEN;
                         if (send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int))) //send back
                         {
                             return -1;
@@ -458,12 +438,52 @@ int main(int argc, char** argv)
                                 break;
                             }
                         }
+                        printf("datalen=%d\n",data.data_len);
+                        printf("flag=%d\n",flag);
                         if (flag == -1)
                         {
                             remove(pk_path);
                             close(pkfd);
                             close(new_fd);
                             continue;
+                        }
+
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int)))     //get password
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        char* de_pass = rsa_decrypt(data.buf);
+                        if (de_pass == NULL)
+                        {
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                        char* v_pass = rsa_verify(de_pass, user_name);
+                        free(de_pass);
+                        de_pass = NULL;
+                        if (v_pass == NULL)
+                        {
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));
+                            close(new_fd);
+                            continue;
+                        }
+                        unsigned char md[SHA512_DIGEST_LENGTH];                     //encrypt password
+                        SHA512((unsigned char*)v_pass, strlen(v_pass), md);
+                        char password[SHA512_DIGEST_LENGTH * 2 + 1] = { 0 };
+                        char tmp[3] = { 0 };
+                        for (int k = 0; k < SHA512_DIGEST_LENGTH; k++)
+                        {
+                            sprintf(tmp, "%02x", md[k]);
+                            strcat(password, tmp);
                         }
 
                         ret = sql_insert_user_trans(conn, user_name, password, "1", 0, user_name, 0, "");

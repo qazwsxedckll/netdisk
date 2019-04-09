@@ -1,25 +1,31 @@
 #include "../include/crypto.h"
 
-int rsa_generate_key()
+int rsa_generate_key(const char* user_name)
 {
     int ret;
-    ret = access("client_rsa.key", F_OK);
+    char pk_path[FILE_NAME_LEN];
+    sprintf(pk_path, "%s_rsa.key", user_name);
+    char cmd[FILE_NAME_LEN];
+    sprintf(cmd, "openssl genrsa -out %s_rsa.key 2048", user_name);
+    ret = access(pk_path, F_OK);
     if (ret)
     {
-        system("openssl genrsa -out client_rsa.key 2048");
+        system(cmd);
     }
-    ret = access("client_rsa.key", F_OK);
+    ret = access(pk_path, F_OK);
     if (ret)
     {
         printf("key generation fail, check if openssl is installed\n");
         return -1;
     }
-    ret = access("client_rsa_pub.key", F_OK);
+    sprintf(pk_path, "%s_rsa_pub.key", user_name);
+    sprintf(cmd, "openssl rsa -in %s_rsa.key -pubout -out %s_rsa_pub.key", user_name, user_name);
+    ret = access(pk_path, F_OK);
     if (ret)
     {
-        system("openssl rsa -in client_rsa.key -pubout -out client_rsa_pub.key");
+        system(cmd);
     }
-    ret = access("client_rsa_pub.key", F_OK);
+    ret = access(pk_path, F_OK);
     if (ret)
     {
         printf("key generation fail, check if openssl is installed\n");
@@ -67,13 +73,15 @@ char* rsa_encrypt(char* str)
     return en_str;
 }
 
-char* rsa_sign(char* str)
+char* rsa_sign(char* str, const char* user_name)
 {
     int ret;
     char* en_str;
     FILE* fp;
 
-    fp = fopen("client_rsa.key", "rb");
+    char pk_path[FILE_NAME_LEN];
+    sprintf(pk_path, "%s_rsa.key", user_name);
+    fp = fopen(pk_path, "rb");
     if (fp == NULL)
     {
         printf("client_rsa.key not found\n");
@@ -107,13 +115,15 @@ char* rsa_sign(char* str)
     return en_str;
 }
 
-char* rsa_decrypt(char* str)
+char* rsa_decrypt(char* str, const char* user_name)
 {
     int ret;
     char* de_str;
     FILE* fp;
 
-    fp = fopen("client_rsa.key", "rb");
+    char pk_path[FILE_NAME_LEN];
+    sprintf(pk_path, "%s_rsa.key", user_name);
+    fp = fopen(pk_path, "rb");
     if (fp == NULL)
     {
         printf("client_rsa.key not found\n");

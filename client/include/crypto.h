@@ -3,11 +3,11 @@
 #include "head.h"
 char* rsa_encrypt(char* str);
 
-char* rsa_sign(char* str);
+char* rsa_sign(char* str, const char* user_name);
 
-char* rsa_decrypt(char* str);
+char* rsa_decrypt(char* str, const char* user_name);
 
 char* rsa_verify(char* str);
 
-int rsa_generate_key();
+int rsa_generate_key(const char* user_name);
 #endif

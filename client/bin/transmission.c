@@ -44,7 +44,7 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
-int send_nonce(int fd, DataPackage* data)
+int send_nonce(int fd, DataPackage* data, const char* user_name)
 {
     int ret;
     char nonce[15];
@@ -89,7 +89,7 @@ int send_nonce(int fd, DataPackage* data)
     {
         return -1;
     }
-    nonce_tmp = rsa_sign(data->buf);
+    nonce_tmp = rsa_sign(data->buf, user_name);
     if (nonce_tmp == NULL)
     {
         return -1;
@@ -110,12 +110,6 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
     int ret;
     int flag = -1, err = 0;
     char invi_code[5];
-
-    ret = rsa_generate_key();
-    if (ret)
-    {
-        return -1;
-    }
 
     while (flag == -1)
     {
@@ -326,6 +320,12 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             return -1;
         }
 
+        ret = rsa_generate_key(user_name);
+        if (ret)
+        {
+            return -1;
+        }
+
         //connect to server
         ret = connect_server(socketFd, ip, port);
         if (ret)
@@ -340,17 +340,10 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             close(*socketFd);
             return -1;
         }
+
         strcpy(data->buf, user_name);
         data->data_len = strlen(data->buf) + 1;
         ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
-        strcpy(data->buf, password);
-        data->data_len = strlen(data->buf) + 1;
-        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
         if (ret)
         {
             close(*socketFd);
@@ -392,7 +385,9 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         nonce_tmp = NULL;
 
         //send pk
-        int pkfd = open("client_rsa_pub.key", O_RDONLY);
+        char pk_path[FILE_NAME_LEN];
+        sprintf(pk_path, "%s_rsa_pub.key", user_name);
+        int pkfd = open(pk_path, O_RDONLY);
         if (pkfd == -1)
         {
             perror("open");
@@ -409,10 +404,36 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
             }
         }
         close(pkfd);
-
         //send end of transmission
         data->data_len = 0;
         ret = send_cycle(*socketFd, (char*)data, sizeof(int));
+        if (ret)
+        {
+            close(*socketFd);
+            return -1;
+        }
+
+        char* s_pass = rsa_sign(password, user_name);
+        free(password);
+        password = NULL;
+        if (s_pass == NULL)
+        {
+            close(*socketFd);
+            return -1;
+        }
+        char *en_pass = rsa_encrypt(s_pass);
+        free(s_pass);
+        s_pass = NULL;
+        if (en_pass == NULL)
+        {
+            close(*socketFd);
+            return -1;
+        }
+        memcpy(data->buf, en_pass, SER_EN_LEN);
+        free(en_pass);
+        en_pass = NULL;
+        data->data_len = SER_EN_LEN;
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
         if (ret)
         {
             close(*socketFd);
@@ -554,7 +575,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        ret = send_nonce(*socketFd, data);          //send nonce
+        ret = send_nonce(*socketFd, data, user_name);          //send nonce
         if (ret)
         {
             close(*socketFd);
@@ -562,7 +583,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        char* s_pass = rsa_sign(password);
+        char* s_pass = rsa_sign(password, user_name);
         free(password);
         password = NULL;
         if (s_pass == NULL)
@@ -657,7 +678,7 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     {
         return -1;
     }
-    ret = send_nonce(*socketFd, data);
+    ret = send_nonce(*socketFd, data, trans_info->user_name);
     if (ret)
     {
         return -1;
