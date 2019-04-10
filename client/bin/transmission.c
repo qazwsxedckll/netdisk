@@ -44,16 +44,14 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
-int send_nonce(int fd, DataPackage* data, const char* user_name)
+int send_nonce(int fd, DataPackage* data)
 {
-    int ret;
     char nonce[15];
     srand((unsigned)(time(NULL)));
     sprintf(nonce, "%d", rand());
     strcpy(data->buf, nonce);
     data->data_len = strlen(data->buf) + 1;
-    ret = send_cycle(fd, (char*)data, data->data_len + sizeof(int));   //send nonce
-    if (ret)
+    if (send_cycle(fd, (char*)data, data->data_len + sizeof(int)))   //send nonce
     {
         return -1;
     }
@@ -80,7 +78,12 @@ int send_nonce(int fd, DataPackage* data, const char* user_name)
     }
     free(nonce_tmp);
     nonce_tmp = NULL;
+    return 0;
+}
 
+int recv_nonce(int fd, DataPackage* data, const char* user_name)
+{
+    char* nonce_tmp;
     if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))        //recv nonce
     {
         return -1;
@@ -281,187 +284,142 @@ int user_signup(int* socketFd, const char* ip, const char* port, char* user_name
         }
     }
 
+    //input password
+    char* password;
     flag = -1;
     while (flag == -1)
     {
-        //input password
-        char* password;
-        flag = -2;
-        while (flag == -2)
+        flag = 0;
+        system("clear");
+        printf("Enter '0' to go back\n");
+        printf("Enter invitation code: %s\n", invi_code);
+        printf("Enter username: %s\n", user_name);
+        if (err == -1)
         {
-            flag = 0;
-            system("clear");
-            printf("Enter '0' to go back\n");
-            printf("Enter invitation code: %s\n", invi_code);
-            printf("Enter username: %s\n", user_name);
-            if (err == -1)
-            {
-                printf("unknown error occured\n");
-                err = 0;
-            }
-            if (err == -2)
-            {
-                printf("password too long!\n");
-                err = 0;
-            }
-            password = getpass("Enter password: ");
-            if (strlen(password) >= 20)
-            {
-                err = -2;       //too long err
-                flag = -2;
-            }
-            else
-            {
-                flag = -1;
-            }
+            printf("password too long!\n");
+            err = 0;
         }
-        if (strcmp(password, "0") == 0)
+        password = getpass("Enter password: ");
+        if (strlen(password) >= 20)
         {
-            return -1;
+            err = -1;       //too long err
+            flag = -1;
         }
+        else
+        {
+            break;
+        }
+    }
 
-        ret = rsa_generate_key(user_name);
-        if (ret)
-        {
-            return -1;
-        }
+    if (strcmp(password, "0") == 0)
+    {
+        return -1;
+    }
 
-        //connect to server
-        ret = connect_server(socketFd, ip, port);
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
-        data->data_len = 6;
-        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
+    ret = rsa_generate_key(user_name);
+    if (ret)
+    {
+        return -1;
+    }
 
-        strcpy(data->buf, user_name);
-        data->data_len = strlen(data->buf) + 1;
-        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
+    //connect to server
+    ret = connect_server(socketFd, ip, port);
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
+    data->data_len = 6;
+    ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //6 for regi password
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
 
-        char nonce[15];
-        srand((unsigned)(time(NULL)));
-        sprintf(nonce, "%d", rand());
-        strcpy(data->buf, nonce);
-        data->data_len = strlen(data->buf) + 1;
-        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send nonce
-        if (ret)
-        {
-            return -1;
-        }
-        if (recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int)))        //recv nonce
-        {
-            return -1;
-        }
-        if (recv_cycle(*socketFd, data->buf, data->data_len))
-        {
-            return -1;
-        }
-        char* nonce_tmp;
-        nonce_tmp = rsa_verify(data->buf);         //verify
-        if (nonce_tmp == NULL)
-        {
-            return -1;
-        }
-        if (strcmp(nonce_tmp, nonce) != 0)
-        {
-            free(nonce_tmp);
-            nonce_tmp = NULL;
-            printf("nonce verification failed\n");
-            return -1;
-        }
-        free(nonce_tmp);
-        nonce_tmp = NULL;
+    strcpy(data->buf, user_name);
+    data->data_len = strlen(data->buf) + 1;
+    ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
 
-        //send pk
-        char pk_path[FILE_NAME_LEN];
-        sprintf(pk_path, "%s_rsa_pub.key", user_name);
-        int pkfd = open(pk_path, O_RDONLY);
-        if (pkfd == -1)
+    ret = send_nonce(*socketFd, data);              //send nonce
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
+    char pk_path[FILE_NAME_LEN];                    //send pk
+    sprintf(pk_path, "%s_rsa_pub.key", user_name);
+    int pkfd = open(pk_path, O_RDONLY);
+    if (pkfd == -1)
+    {
+        perror("open");
+        close(*socketFd);
+        return -1;
+    }
+    while ((data->data_len = read(pkfd, data->buf, sizeof(data->buf))) > 0)
+    {
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
+        if (ret == -1)
         {
-            perror("open");
-            close(*socketFd);
+            close(pkfd);
             return -1;
         }
-        while ((data->data_len = read(pkfd, data->buf, sizeof(data->buf))) > 0)
-        {
-            ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));
-            if (ret == -1)
-            {
-                close(pkfd);
-                return -1;
-            }
-        }
-        close(pkfd);
-        //send end of transmission
-        data->data_len = 0;
-        ret = send_cycle(*socketFd, (char*)data, sizeof(int));
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
+    }
+    close(pkfd);
+    //send end of transmission
+    data->data_len = 0;
+    ret = send_cycle(*socketFd, (char*)data, sizeof(int));
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
 
-        char* s_pass = rsa_sign(password, user_name);
-        free(password);
-        password = NULL;
-        if (s_pass == NULL)
-        {
-            close(*socketFd);
-            return -1;
-        }
-        char *en_pass = rsa_encrypt(s_pass);
-        free(s_pass);
-        s_pass = NULL;
-        if (en_pass == NULL)
-        {
-            close(*socketFd);
-            return -1;
-        }
-        memcpy(data->buf, en_pass, SER_EN_LEN);
-        free(en_pass);
-        en_pass = NULL;
-        data->data_len = SER_EN_LEN;
-        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
+    char *en_pass = rsa_encrypt(password);
+    free(password);
+    password = NULL;
+    if (en_pass == NULL)
+    {
+        close(*socketFd);
+        return -1;
+    }
+    memcpy(data->buf, en_pass, SER_EN_LEN);
+    free(en_pass);
+    en_pass = NULL;
+    data->data_len = SER_EN_LEN;
+    ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
 
-        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
-        if (ret)
-        {
-            close(*socketFd);
-            return -1;
-        }
+    ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));         //recv comfirmation
+    if (ret)
+    {
+        close(*socketFd);
+        return -1;
+    }
 
-        if (data->data_len == 0)
-        {
-            flag = 0;
-            close(*socketFd);
-        }
-        else if (data->data_len == -1)
-        {
-            err = -1;
-            close(*socketFd);
-        }
+    if (data->data_len == 0)
+    {
+        flag = 0;
+        close(*socketFd);
+    }
+    else if (data->data_len == -1)
+    {
+        close(*socketFd);
+        return -1;
     }
     return 0;
 }
 
-int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data)
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, TransInfo* trans_info)
 {
     int flag, ret, err;
     flag = -1;
@@ -520,6 +478,60 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             return -1;
         }
 
+        char pk_path[FILE_NAME_LEN];
+        sprintf(pk_path, "%s_rsa.key", user_name);
+        if (access(pk_path, F_OK)  == 0)
+        {
+            ret = connect_server(socketFd, ip, port);
+            if (ret)
+            {
+                continue;
+            }
+
+            data->data_len = 1;
+            ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //1 for no pwd login
+            if (ret)
+            {
+                close(*socketFd);
+                continue;
+            }
+
+            strcpy(data->buf, user_name);
+            data->data_len = strlen(data->buf) + 1;
+            ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send user_name
+            if (ret)
+            {
+                close(*socketFd);
+                continue;
+            }
+
+            ret = send_nonce(*socketFd, data);          //send nonce
+            if (ret)
+            {
+                close(*socketFd);
+                err = -3;
+                continue;
+            }
+
+            ret = recv_nonce(*socketFd, data, user_name);
+            if (ret)
+            {
+                close(*socketFd);
+                continue;
+            }
+
+            ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));   //recv comfirm
+            if (ret)
+            {
+                close(*socketFd);
+                continue;
+            }
+            if (data->data_len == 0)
+            {
+                break;
+            }
+        }
+
         //input password
         flag = -2;
         while (flag == -2)
@@ -550,6 +562,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             password = NULL;
             return -1;
         }
+        strcpy(trans_info->password, password);
 
         //connect to server
         ret = connect_server(socketFd, ip, port);
@@ -575,7 +588,7 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        ret = send_nonce(*socketFd, data, user_name);          //send nonce
+        ret = send_nonce(*socketFd, data);          //send nonce
         if (ret)
         {
             close(*socketFd);
@@ -583,17 +596,9 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
             continue;
         }
 
-        char* s_pass = rsa_sign(password, user_name);
+        char *en_pass = rsa_encrypt(password);
         free(password);
         password = NULL;
-        if (s_pass == NULL)
-        {
-            close(*socketFd);
-            continue;
-        }
-        char *en_pass = rsa_encrypt(s_pass);
-        free(s_pass);
-        s_pass = NULL;
         if (en_pass == NULL)
         {
             close(*socketFd);
@@ -655,7 +660,7 @@ int tran_cmd(int socket_fd, DataPackage* data)
     return 0;
 }
 
-int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int code)
+int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int code, const char* password)
 {
     int ret;
     ret = connect_server(socketFd, trans_info->ip_address, trans_info->port);
@@ -663,8 +668,8 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     {
         return -1;
     }
-    data->data_len = code;
 
+    data->data_len = code;
     ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //2 for gets 3 for puts
     if (ret)
     {
@@ -673,12 +678,65 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
 
     strcpy(data->buf, trans_info->user_name);
     data->data_len = strlen(data->buf) + 1;
-    ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int)); //send username and nonce
+    ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int)); //send username
     if (ret)
     {
         return -1;
     }
-    ret = send_nonce(*socketFd, data, trans_info->user_name);
+
+    char pk_path[FILE_NAME_LEN];
+    sprintf(pk_path, "%s_rsa.key", trans_info->user_name);
+    ret = access(pk_path, F_OK);
+    if (ret)
+    {
+        data->data_len = -1;
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //send no key
+        if (ret)
+        {
+            return -1;
+        }
+        char *en_pass = rsa_encrypt(password);
+        if (en_pass == NULL)
+        {
+            return -1;
+        }
+        memcpy(data->buf, en_pass, SER_EN_LEN);
+        free(en_pass);
+        en_pass = NULL;
+        data->data_len = SER_EN_LEN;
+        ret = send_cycle(*socketFd, (char*)data, data->data_len + sizeof(int));   //send password
+        if (ret)
+        {
+            return -1;
+        }
+
+        ret = recv_cycle(*socketFd, (char*)&data->data_len, sizeof(int));      //recv confirm
+        if (ret)
+        {
+            return -1;
+        }
+        if (data->data_len == -1)
+        {
+            printf("verification failed\n");
+            return -1;
+        }
+    }
+    else
+    {
+        data->data_len = 0;
+        ret = send_cycle(*socketFd, (char*)data, sizeof(int));        //send with key
+        if (ret)
+        {
+            return -1;
+        }
+        ret = recv_nonce(*socketFd, data, trans_info->user_name);
+        if (ret)
+        {
+            return -1;
+        }
+    }
+
+    ret = send_nonce(*socketFd, data);
     if (ret)
     {
         return -1;
@@ -729,7 +787,7 @@ void* get_files(void* p)
     int ret, socketFd;
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
-    ret = thread_connect(&socketFd, &data, trans_info, 2);
+    ret = thread_connect(&socketFd, &data, trans_info, 2, trans_info->password);
     if (ret)
     {
         close(socketFd);
@@ -748,8 +806,11 @@ void* get_files(void* p)
         close(socketFd);
         pthread_exit(NULL);
     }
-    ret = mkdir("downloads", 0775);
-    char path_name[CMD_LEN] = "downloads/";
+    mkdir("downloads", 0775);
+    char path_name[CMD_LEN];
+    sprintf(path_name, "%s/%s", "downloads", trans_info->user_name);
+    mkdir(path_name, 0775);
+    strcat(path_name, "/");
     strcat(path_name, data.buf);
     int fd = open(path_name, O_WRONLY|O_TRUNC|O_CREAT, 0664);
     if (fd == -1)
@@ -834,12 +895,6 @@ void* put_files(void* p)
     int ret, socketFd;
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
-    ret = thread_connect(&socketFd, &data, trans_info, 3);
-    if (ret)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
 
     //open file
     char file_path[CMD_LEN];
@@ -854,6 +909,13 @@ void* put_files(void* p)
     if (fd == -1)
     {
         printf("file not exist\n");
+        pthread_exit(NULL);
+    }
+
+    //connection
+    ret = thread_connect(&socketFd, &data, trans_info, 3, trans_info->password);
+    if (ret)
+    {
         close(socketFd);
         pthread_exit(NULL);
     }

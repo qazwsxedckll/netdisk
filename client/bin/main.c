@@ -30,7 +30,7 @@ int main(int argc, char** argv)
         if (ret == '1')
         {
             //user authentication
-            ret = tran_authen(&socketFd, argv[1], argv[2], user_name, &data);
+            ret = tran_authen(&socketFd, argv[1], argv[2], user_name, &data, &trans_info);
             if (ret == -1)
             {
                 continue;
@@ -43,6 +43,20 @@ int main(int argc, char** argv)
             ret = user_signup(&socketFd, argv[1], argv[2], user_name, &data);
             if (ret == -1)
             {
+                //delete key file
+                char pk_path[FILE_NAME_LEN];
+                sprintf(pk_path, "%s_rsa.key", user_name);
+                ret = access(pk_path, F_OK);
+                if (ret)
+                {
+                    remove(pk_path);
+                }
+                sprintf(pk_path, "%s_rsa_pub.key", user_name);
+                ret = access(pk_path, F_OK);
+                if (ret)
+                {
+                    remove(pk_path);
+                }
                 regi_flag = -1;
                 continue;
             }

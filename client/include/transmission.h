@@ -9,7 +9,7 @@ int tran_cmd(int fd, DataPackage* data);
 
 int user_signup(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data);
 
-int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data);
+int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name, DataPackage* data, TransInfo* trans_info);
 
 void* get_files(void* p);
 

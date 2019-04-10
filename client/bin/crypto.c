@@ -34,7 +34,7 @@ int rsa_generate_key(const char* user_name)
     return 0;
 }
 
-char* rsa_encrypt(char* str)
+char* rsa_encrypt(const char* str)
 {
     int ret;
     char* en_str;;
@@ -58,8 +58,9 @@ char* rsa_encrypt(char* str)
         return NULL;
     }
 
+    int len = strlen(str);
     en_str = (char*)calloc(SER_EN_LEN, sizeof(char));
-    ret = RSA_public_encrypt(RSA_EN_LEN, (unsigned char*)str, (unsigned char*)en_str, rsa, RSA_PKCS1_PADDING);
+    ret = RSA_public_encrypt(len, (unsigned char*)str, (unsigned char*)en_str, rsa, RSA_PKCS1_PADDING);
     if (ret == -1)
     {
         printf("rsa_encrypt failed\n");
@@ -84,7 +85,7 @@ char* rsa_sign(char* str, const char* user_name)
     fp = fopen(pk_path, "rb");
     if (fp == NULL)
     {
-        printf("client_rsa.key not found\n");
+        printf("%s not found\n", pk_path);
         return NULL;
     }
 

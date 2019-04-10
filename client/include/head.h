@@ -41,6 +41,7 @@
 typedef struct
 {
     char user_name[USER_LEN];
+    char password[USER_LEN];
     char ip_address[20];
     char port[6];
     char cmd[CMD_LEN];

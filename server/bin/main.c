@@ -85,7 +85,7 @@ int main(int argc, char** argv)
                     printf("incoming connection\n");
 #endif
                     if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //4 for invitation code, 5 for regi name, 6 for password
-                    {                                                           //get connection code 0 for login, 2 for gets, 3 for puts
+                    {                                                           //0 for login, 1 for no pwd login, 2 for gets, 3 for puts
                         close(new_fd);
                         continue;
                     }
@@ -159,6 +159,61 @@ int main(int argc, char** argv)
                                 close(new_fd);
                                 continue;
                             }
+                        }
+
+                        for (j = 0; j < max_client; j++)
+                        {
+                            if (users[j].fd == 0)
+                            {
+                                users[j].fd = new_fd;
+                                break;
+                            }
+                        }
+                        //sql root dir by user_name
+                        char* root_dir = user_find_root(conn, user_name);
+                        strcpy(users[j].root_id, root_dir);
+                        strcpy(users[j].cur_dir_id, root_dir);
+                        strcpy(users[j].user_name, user_name);
+                        free(root_dir);
+                        root_dir = NULL;
+                        event.data.fd = users[j].fd;
+                        epoll_ctl(epfd, EPOLL_CTL_ADD, users[j].fd, &event);
+                        cur_client_num++;
+#ifdef _DEBUG
+                        printf("cur_client_num: %d\n", cur_client_num);
+#endif
+                        continue;
+                    }
+
+                    if (data.data_len == 1)
+                    {
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get username
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        if (recv_cycle(new_fd, data.buf, data.data_len))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+                        strcpy(user_name, data.buf);
+
+                        if (recv_nonce(new_fd, &data, user_name))
+                        {
+                            data.data_len = -1;
+                            send_cycle(new_fd, (char*)&data, sizeof(int));      //send verification failed
+                            close(new_fd);
+                            continue;
+                        }
+#ifdef _DEBUG
+                        printf("user_verified\n");
+#endif
+                        data.data_len = 0;
+                        if (send_cycle(new_fd, (char*)&data, sizeof(int)))      //send user verified
+                        {
+                            close(new_fd);
+                            continue;
                         }
 
                         for (j = 0; j < max_client; j++)
