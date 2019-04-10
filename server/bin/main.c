@@ -104,7 +104,7 @@ int main(int argc, char** argv)
                         }
                         strcpy(user_name, data.buf);
 
-                        if (recv_nonce(new_fd, &data, user_name))
+                        if (recv_nonce(new_fd, &data))
                         {
                             close(new_fd);
                             continue;
@@ -129,21 +129,13 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
-                        char* v_pass = rsa_verify(de_pass, user_name);
-                        free(de_pass);
-                        de_pass = NULL;
-                        if (v_pass == NULL)
-                        {
-                            data.data_len = -1;
-                            send_cycle(new_fd, (char*)&data, sizeof(int));
-                            close(new_fd);
-                            continue;
-                        }
 #ifdef _DEBUG
                         printf("username: %s\n", user_name);
-                        printf("password: %s\n", v_pass);
+                        printf("password: %s\n", de_pass);
 #endif
-                        ret = user_verify(conn, user_name, v_pass);
+                        ret = user_verify(conn, user_name, de_pass);
+                        free(de_pass);
+                        de_pass = NULL;
                         if (ret)
                         {
                             data.data_len = -1;
@@ -153,7 +145,7 @@ int main(int argc, char** argv)
                         }
                         else
                         {
-                            data.data_len = -0;
+                            data.data_len = 0;
                             if(send_cycle(new_fd, (char*)&data, sizeof(int)))      //send confirm
                             {
                                 close(new_fd);
@@ -187,6 +179,9 @@ int main(int argc, char** argv)
 
                     if (data.data_len == 1)
                     {
+#ifdef _DEBUG
+                        printf("connection for no pwd login\n");
+#endif
                         if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get username
                         {
                             close(new_fd);
@@ -199,7 +194,13 @@ int main(int argc, char** argv)
                         }
                         strcpy(user_name, data.buf);
 
-                        if (recv_nonce(new_fd, &data, user_name))
+                        if (recv_nonce(new_fd, &data))
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+
+                        if (send_nonce(new_fd, &data, user_name))
                         {
                             data.data_len = -1;
                             send_cycle(new_fd, (char*)&data, sizeof(int));      //send verification failed
@@ -257,7 +258,65 @@ int main(int argc, char** argv)
                         }
                         strcpy(user_name, data.buf);
 
-                        if (recv_nonce(new_fd, &data, user_name))
+                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //recv key stat
+                        {
+                            close(new_fd);
+                            continue;
+                        }
+
+                        if (data.data_len == -1)            //no key
+                        {
+                            if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get password
+                            {
+                                close(new_fd);
+                                continue;
+                            }
+                            if (recv_cycle(new_fd, data.buf, data.data_len))
+                            {
+                                close(new_fd);
+                                continue;
+                            }
+
+                            char* de_pass = rsa_decrypt(data.buf);
+                            if (de_pass == NULL)
+                            {
+                                data.data_len = -1;
+                                send_cycle(new_fd, (char*)&data, sizeof(int));
+                                close(new_fd);
+                                continue;
+                            }
+
+                            ret = user_verify(conn, user_name, de_pass);
+                            free(de_pass);
+                            de_pass = NULL;
+                            if (ret)
+                            {
+                                data.data_len = -1;
+                                send_cycle(new_fd, (char*)&data, sizeof(int));
+                                close(new_fd);
+                                continue;
+                            }
+                            else
+                            {
+                                data.data_len = 0;
+                                if(send_cycle(new_fd, (char*)&data, sizeof(int)))      //send confirm
+                                {
+                                    close(new_fd);
+                                    continue;
+                                }
+                            }
+
+                        }
+                        else
+                        {
+                            if (send_nonce(new_fd, &data, user_name))
+                            {
+                                close(new_fd);
+                                continue;
+                            }
+                        }
+
+                        if (recv_nonce(new_fd, &data))
                         {
                             data.data_len = -1;
                             send_cycle(new_fd, (char*)&data, sizeof(int));      //send verification failed
@@ -430,27 +489,10 @@ int main(int argc, char** argv)
                         strcpy(user_name, data.buf);
 
                         //recv nonce
-                        if (recv_cycle(new_fd, (char*)&data.data_len, sizeof(int))) //get nonce
+                        if (recv_nonce(new_fd, &data))
                         {
-                            return -1;
-                        }
-                        if (recv_cycle(new_fd, data.buf, data.data_len))
-                        {
-                            return -1;
-                        }
-                        char* nonce_tmp;
-                        nonce_tmp = rsa_sign(data.buf);
-                        if (nonce_tmp == NULL)
-                        {
-                            return -1;
-                        }
-                        memcpy(data.buf, nonce_tmp, SER_EN_LEN);  //sign
-                        free(nonce_tmp);
-                        nonce_tmp = NULL;
-                        data.data_len = SER_EN_LEN;
-                        if (send_cycle(new_fd, (char*)&data, data.data_len + sizeof(int))) //send back
-                        {
-                            return -1;
+                            close(new_fd);
+                            continue;
                         }
 
                         //recv pk
@@ -493,8 +535,6 @@ int main(int argc, char** argv)
                                 break;
                             }
                         }
-                        printf("datalen=%d\n",data.data_len);
-                        printf("flag=%d\n",flag);
                         if (flag == -1)
                         {
                             remove(pk_path);
@@ -521,18 +561,8 @@ int main(int argc, char** argv)
                             close(new_fd);
                             continue;
                         }
-                        char* v_pass = rsa_verify(de_pass, user_name);
-                        free(de_pass);
-                        de_pass = NULL;
-                        if (v_pass == NULL)
-                        {
-                            data.data_len = -1;
-                            send_cycle(new_fd, (char*)&data, sizeof(int));
-                            close(new_fd);
-                            continue;
-                        }
                         unsigned char md[SHA512_DIGEST_LENGTH];                     //encrypt password
-                        SHA512((unsigned char*)v_pass, strlen(v_pass), md);
+                        SHA512((unsigned char*)de_pass, strlen(de_pass), md);
                         char password[SHA512_DIGEST_LENGTH * 2 + 1] = { 0 };
                         char tmp[3] = { 0 };
                         for (int k = 0; k < SHA512_DIGEST_LENGTH; k++)
@@ -597,7 +627,6 @@ int main(int argc, char** argv)
                     cmd_interpret(data.buf, prefix, cmd_path);
                     /*return:
                      *  1 for normal cmd
-                     *  3 for rm success
                      *  -1 for ls error
                      *  -2 for cd error
                      *  -3 for rm error
@@ -624,7 +653,7 @@ int main(int argc, char** argv)
                     }
                     else if (strcmp(prefix, "rm") == 0)
                     {
-                        ret = resolve_rm(cmd_path, 0, conn, users[j].user_name, users[j].root_id, users[j].cur_dir_id);
+                        ret = resolve_rm(&result, &res_lines, cmd_path, conn, users[j].user_name, users[j].root_id, users[j].cur_dir_id);
                     }
                     else if (strcmp(prefix, "mkdir") == 0)
                     {
@@ -683,18 +712,6 @@ int main(int argc, char** argv)
                                     close(users[j].fd);
                                     break;
                                 }
-                            }
-                        }
-                        if (ret == 3)       //remove success
-                        {
-                            strcpy(data.buf, cmd_path);
-                            strcat(data.buf, "\tis removed");
-                            data.data_len = strlen(data.buf) + 1;
-                            if (send_cycle(users[j].fd, (char*)&data, data.data_len + sizeof(int)))
-                            {
-                                users[j].fd = 0;
-                                close(users[j].fd);
-                                break;
                             }
                         }
                     }

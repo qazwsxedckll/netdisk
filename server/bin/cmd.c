@@ -330,132 +330,97 @@ int resolve_puts(const char* cmd_path, MYSQL* conn, const char* root_id, const c
     }
 }
 
-int resolve_rm(const char* cmd_path, int abs_flag, MYSQL* conn, const char* user_name, const char* root_id, const char* cur_dir_id)
+int resolve_rm(char*** result, int *n, const char* cmd_path, MYSQL* conn, const char* user_name, const char* root_id, const char* cur_dir_id)
 {
     char* abs_path;
     int ret, num;
     MYSQL_RES* res;
+    MYSQL_RES* md5_res;
     MYSQL_ROW row;
 
-
-    if (abs_flag == 0)
-    {
-        abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
-    }
-    else
-    {
-        abs_path = (char*)malloc(RESULT_LEN);
-        strcpy(abs_path, cmd_path);
-    }
+    abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
     if (abs_path == NULL)
     {
         return -3;
     }
-    res = sql_select(conn, "file", "file_path", abs_path, 0);
+
+    char regexp[QUERY_LEN] = "^";
+    strcat(regexp, abs_path);
+    free(abs_path);
+    abs_path = NULL;
+    res = sql_select(conn, "file", "file_path", regexp, 1);
     if (res == NULL)
     {
         return -3;
     }
-
-    row = mysql_fetch_row(res);
-    mysql_free_result(res);
-    if (atoi(row[2]) == 0)      //is dir
+    *n = mysql_num_rows(res);
+    *result = (char**)malloc(*n * sizeof(char*));
+    for (int i = 0; i < *n; i++)
     {
-        ret = sql_delete_file(conn, user_name, abs_path);
-        if (ret == -1)
+        (*result)[i] = (char*)malloc(RESULT_LEN);
+        row = mysql_fetch_row(res);
+        if (atoi(row[2]) == 0)
         {
-            return -3;
-        }
-        char regexp[QUERY_LEN] = "^";
-        strcat(regexp, abs_path);
-        free(abs_path);
-        abs_path = NULL;
-        res = sql_select(conn, "file", "file_path", regexp, 1);
-        if (res == NULL)
-        {
-            //delete account
-            if (strcmp(cmd_path, "/") == 0 || strcmp(cmd_path, "./") == 0)
-            {
-                char pk_path[RESULT_LEN];
-                sprintf(pk_path, "keys/%s_%s.key", user_name, "pub");
-                ret = remove(pk_path);
-                if (ret)
-                {
-                    return -3;
-                }
-                ret = sql_delete_user(conn, user_name);
-                if (ret)
-                {
-                    return -3;
-                }
-                else
-                {
-                    return -10;
-                }
-            }
-            return 3;
-        }
-        num = mysql_num_rows(res);
-        for (int i = 0; i < num; i++)
-        {
-            row = mysql_fetch_row(res);
-            resolve_rm(row[5], 1, conn, user_name, root_id, cur_dir_id);
-        }
-        mysql_free_result(res);
-        //delete account
-        if (strcmp(cmd_path, "/") == 0 || strcmp(cmd_path, "./") == 0)
-        {
-            ret = sql_delete_user(conn, user_name);
-            if (ret)
-            {
-                return -3;
-            }
-            char pk_path[RESULT_LEN];
-            sprintf(pk_path, "keys/%s_%s.key", user_name, "pub");
-            ret = remove(pk_path);
-            if (ret)
-            {
-                return -3;
-            }
-            else
-            {
-                return -10;
-            }
-        }
-        return 3;
-    }
-    else            //is file
-    {
-        char file_md5[MD5_LEN];
-        strcpy(file_md5, row[6]);
-        res = sql_select(conn, "file", "file_md5", file_md5, 0);
-        num = mysql_num_rows(res);
-        mysql_free_result(res);
-
-        ret = sql_delete_file(conn, user_name, abs_path);
-        free(abs_path);
-        abs_path = NULL;
-        if (ret == -1)
-        {
-            return -3;
-        }
-
-        if(num == 1)       //last file
-        {
-            char path_name[RESULT_LEN] = "../netdisk/";
-            strcat(path_name, file_md5);
-            ret = remove(path_name);
+            ret = sql_delete_file(conn, user_name, row[5]);
             if (ret == -1)
             {
                 return -3;
             }
-#ifdef _DEBUG
-            printf("%s is removed from disk\n", path_name);
-#endif
-            return 3;
+            sprintf((*result)[i], "%s is removed", row[3]);
         }
-        return 3;
+        else
+        {
+            char file_md5[MD5_LEN];
+            strcpy(file_md5, row[6]);
+            md5_res = sql_select(conn, "file", "file_md5", file_md5, 0);
+            num = mysql_num_rows(md5_res);
+            mysql_free_result(md5_res);
+
+            ret = sql_delete_file(conn, user_name, row[5]);
+            if (ret == -1)
+            {
+                return -3;
+            }
+            sprintf((*result)[i], "%s is removed", row[3]);
+
+            if(num == 1)       //last file
+            {
+                char path_name[RESULT_LEN] = "netdisk/";
+                strcat(path_name, file_md5);
+                ret = remove(path_name);
+                if (ret == -1)
+                {
+                    return -3;
+                }
+#ifdef _DEBUG
+                printf("%s is removed from disk\n", path_name);
+#endif
+            }
+        }
     }
+    mysql_free_result(res);
+
+    //delete account
+    if (strcmp(cmd_path, "/") == 0 || strcmp(cmd_path, "./") == 0)
+    {
+        char pk_path[RESULT_LEN];
+        sprintf(pk_path, "keys/%s_%s.key", user_name, "pub");
+        ret = remove(pk_path);
+        if (ret)
+        {
+            return -3;
+        }
+        ret = sql_delete_user(conn, user_name);
+        if (ret)
+        {
+            return -3;
+        }
+        else
+        {
+            return -10;
+        }
+    }
+    return 1;
 }
 
 void cmd_interpret(const char*cmd, char* prefix, char* cmd_path)

@@ -44,7 +44,44 @@ int recv_cycle(int fd, char* data, int recv_len)
     return 0;
 }
 
-int recv_nonce(int fd, DataPackage* data, char* user_name)
+int send_nonce(int fd, DataPackage* data, const char* user_name)
+{
+    char nonce[15];
+    srand((unsigned)(time(NULL)));
+    sprintf(nonce, "%d", rand());
+    strcpy(data->buf, nonce);
+    data->data_len = strlen(data->buf) + 1;
+    if (send_cycle(fd, (char*)data, data->data_len + sizeof(int)))
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))
+    {
+        return -1;
+    }
+    if (recv_cycle(fd, data->buf, data->data_len))
+    {
+        return -1;
+    }
+    char* nonce_tmp;
+    nonce_tmp = rsa_verify(data->buf, user_name);
+    if (nonce_tmp == NULL)
+    {
+        return -1;
+    }
+    if (strcmp(nonce_tmp, nonce) != 0)
+    {
+        free(nonce_tmp);
+        nonce_tmp =NULL;
+        printf("nonce verification failed\n");
+        return -1;
+    }
+    free(nonce_tmp);
+    nonce_tmp = NULL;
+    return 0;
+}
+
+int recv_nonce(int fd, DataPackage* data)
 {
     if (recv_cycle(fd, (char*)&data->data_len, sizeof(int))) //get nonce
     {
@@ -68,40 +105,6 @@ int recv_nonce(int fd, DataPackage* data, char* user_name)
     {
         return -1;
     }
-
-    int ret;
-    char nonce[15];
-    srand((unsigned)(time(NULL)));
-    sprintf(nonce, "%d", rand());
-    strcpy(data->buf, nonce);
-    data->data_len = strlen(data->buf) + 1;
-    ret = send_cycle(fd, (char*)data, data->data_len + sizeof(int));
-    if (ret)
-    {
-        return -1;
-    }
-    if (recv_cycle(fd, (char*)&data->data_len, sizeof(int)))
-    {
-        return -1;
-    }
-    if (recv_cycle(fd, data->buf, data->data_len))
-    {
-        return -1;
-    }
-    nonce_tmp = rsa_verify(data->buf, user_name);
-    if (nonce_tmp == NULL)
-    {
-        return -1;
-    }
-    if (strcmp(nonce_tmp, nonce) != 0)
-    {
-        free(nonce_tmp);
-        nonce_tmp =NULL;
-        printf("nonce verification failed\n");
-        return -1;
-    }
-    free(nonce_tmp);
-    nonce_tmp = NULL;
     return 0;
 }
 
