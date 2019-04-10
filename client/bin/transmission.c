@@ -473,8 +473,6 @@ int tran_authen(int* socketFd, const char* ip, const char* port, char* user_name
         user_name[ret - 1] = '\0';
         if (strcmp(user_name, "0") == 0)
         {
-            free(password);
-            password = NULL;
             return -1;
         }
 
@@ -921,7 +919,7 @@ void* put_files(void* p)
     }
 
     //send md5
-    printf("\ruploading...   0.0%%");
+    printf("\ruploading... %4.1f%%", 0.0);
     fflush(stdout);
     char file_md5[MD5_LEN] = {0};
     ret = compute_file_md5(fd, file_md5);

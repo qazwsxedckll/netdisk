@@ -1,6 +1,6 @@
 #include "../include/crypto.h"
 
-char* rsa_encrypt(char* str, char* user_name)
+char* rsa_encrypt(char* str, const char* user_name)
 {
     int ret;
     char* en_str;;
@@ -134,7 +134,7 @@ char* rsa_decrypt(char* str)
     return de_str;
 }
 
-char* rsa_verify(char* str, char* user_name)
+char* rsa_verify(char* str, const char* user_name)
 {
     int ret;
     char* de_str;

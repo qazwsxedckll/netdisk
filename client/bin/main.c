@@ -47,13 +47,13 @@ int main(int argc, char** argv)
                 char pk_path[FILE_NAME_LEN];
                 sprintf(pk_path, "%s_rsa.key", user_name);
                 ret = access(pk_path, F_OK);
-                if (ret)
+                if (ret == 0)
                 {
                     remove(pk_path);
                 }
                 sprintf(pk_path, "%s_rsa_pub.key", user_name);
                 ret = access(pk_path, F_OK);
-                if (ret)
+                if (ret == 0)
                 {
                     remove(pk_path);
                 }

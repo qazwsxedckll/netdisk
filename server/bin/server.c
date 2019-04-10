@@ -2,6 +2,8 @@
 #include "../include/config.h"
 #include "../include/transmission.h"
 
+extern int exit_flag;
+
 void* transmission(void* pf)
 {
     int ret;
@@ -14,6 +16,11 @@ void* transmission(void* pf)
         pthread_mutex_lock(&pq->mutex);
         if (pq->que_size == 0)
         {
+            if (exit_flag == 1)
+            {
+                pthread_mutex_unlock(&pq->mutex);
+                pthread_exit(NULL);
+            }
             pthread_cond_wait(&p->cond, &pq->mutex);
         }
         is_get = que_get(pq, &pcur);
@@ -159,7 +166,7 @@ int epoll_init(int* epfd, struct epoll_event** evs, int socketFd, const Config* 
 
     *epfd = epoll_create(1);
     struct epoll_event event;
-    *evs = (struct epoll_event*)calloc(1 + atoi(max_client), sizeof(struct epoll_event));
+    *evs = (struct epoll_event*)calloc(2 + atoi(max_client), sizeof(struct epoll_event));
     event.events = EPOLLIN;
     event.data.fd = socketFd;
     epoll_ctl(*epfd, EPOLL_CTL_ADD, socketFd, &event);

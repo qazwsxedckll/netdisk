@@ -5,6 +5,14 @@
 #include "../include/sql.h"
 #include "../include/cmd.h"
 
+int exit_fds[2];
+int exit_flag = 0;
+void exit_handler(int signum)
+{
+    write(exit_fds[1], &signum, 1);
+    exit_flag = 1;
+}
+
 int main(int argc, char** argv)
 {
     if (argc != 2)
@@ -60,6 +68,12 @@ int main(int argc, char** argv)
     struct epoll_event event, *evs;
     event.events = EPOLLIN;
     epoll_init(&epfd, &evs, socketFd, configs, config_count);
+
+    //exit mechanism
+    pipe(exit_fds);
+    signal(SIGINT, exit_handler);
+    event.data.fd = exit_fds[0];
+    epoll_ctl(epfd, EPOLL_CTL_ADD, exit_fds[0], &event);
 
     int res_lines, i, j, ready_fd_num, cur_client_num = 0;
     //transmission
@@ -712,7 +726,11 @@ int main(int argc, char** argv)
                                     close(users[j].fd);
                                     break;
                                 }
+                                free(result[i]);
+                                result[i] = NULL;
                             }
+                            free(result);
+                            result = NULL;
                         }
                     }
                     //send end of transmission
@@ -725,9 +743,24 @@ int main(int argc, char** argv)
                     break;
                 }
             }
+
+            if (evs[i].data.fd == exit_fds[0])
+            {
+                pthread_cond_broadcast(&f.cond);
+                for (j = 0; j< thread_num; j++)
+                {
+                    pthread_join(*(f.pth_id + j), NULL);
+#ifdef _DEBUG
+                    printf("pthread %d exited\n", j);
+#endif
+                }
+                mysql_close(conn);
+#ifdef _DEBUG
+                printf("database closed\n");
+#endif
+                return 0;
+            }
         }
     }
-    mysql_close(conn);
-    return 0;
 }
 
