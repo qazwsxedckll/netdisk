@@ -400,7 +400,7 @@ int main(int argc, char** argv)
                                     pnew->new_fd = new_fd;
                                     pnew->code = 3;
                                     strcpy(pnew->file_name, users[j].user_name);    //send username via file_name
-                                    strcpy(pnew->file_size, users[j].cur_dir_id);                  //send cur_dir_id via file size
+                                    strcpy(pnew->file_size, users[j].cur_dir_id);   //send cur_dir_id via file_size
                                     pthread_mutex_lock(&f.que.mutex);
                                     que_insert(&f.que, pnew);
                                     pthread_mutex_unlock(&f.que.mutex);
@@ -409,13 +409,9 @@ int main(int argc, char** argv)
                                     printf("start receiving\n");
 #endif
                                 }
+                                break;
                             }
-                            break;
                         }
-
-                        data.data_len = 0;
-                        send_cycle(new_fd, (char*)&data, sizeof(int));
-                        continue;
                     }
 
                     if (data.data_len == 4)
@@ -724,7 +720,6 @@ int main(int argc, char** argv)
                                 {
                                     users[j].fd = 0;
                                     close(users[j].fd);
-                                    break;
                                 }
                                 free(result[i]);
                                 result[i] = NULL;

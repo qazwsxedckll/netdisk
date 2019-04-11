@@ -19,8 +19,8 @@ int recv_cycle(int fd, char* data, int recv_len);
 
 int recv_nonce(int fd, DataPackage* data);
 
-int send_file(int client_fd, const char* file_name, const char* file_md5, const char* file_size);
+int send_files(int client_fd, const char* file_name, const char* file_md5, const char* file_size);
 
-int recv_file(int client_fd, const char* user_name, const char* cur_dir_id);
+int recv_files(int client_fd, const char* user_name, char* cur_dir_id);
 
 #endif

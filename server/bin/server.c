@@ -6,7 +6,6 @@ extern int exit_flag;
 
 void* transmission(void* pf)
 {
-    int ret;
     pFactory_t p = (pFactory_t)pf;
     pQue_t pq = &p->que;
     pNode_t pcur;
@@ -29,17 +28,33 @@ void* transmission(void* pf)
         {
             if (pcur->code == 2)
             {
-                send_file(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size);
+                if (send_files(pcur->new_fd, pcur->file_name, pcur->file_md5, pcur->file_size))
+                {
+#ifdef _DEBUG
+                    printf("transmission failed\n");
+#endif
+                }
+                else
+                {
+#ifdef _DEBUG
+                    printf("transmission succeed\n");
+#endif
+                }
             }
             else if (pcur->code == 3)
             {
-                ret = recv_file(pcur->new_fd, pcur->file_name, pcur->file_size);     //user_name && cur_dir_id
-#ifdef _DEBUG
-                if (ret == 0)
+                if (recv_files(pcur->new_fd, pcur->file_name, pcur->file_size))     //user_name && cur_dir_id
                 {
-                    printf("transmission succeed\n");
-                }
+#ifdef _DEBUG
+                    printf("transmission failed\n");
 #endif
+                }
+                else
+                {
+#ifdef _DEBUG
+                    printf("transmission succeed\n");
+#endif
+                }
             }
             free(pcur);
             pcur = NULL;

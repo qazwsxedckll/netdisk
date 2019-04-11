@@ -82,6 +82,27 @@ int main(int argc, char** argv)
         }
         else if (ret == 2)          // 2 for gets
         {
+            char file_name[CMD_LEN];
+            int i = strlen(data.buf);
+            while (data.buf[i] != ' ' && data.buf[i] != '/')
+            {
+                i--;
+            }
+            i++;
+            int j = 0;
+            while (data.buf[i - 1] != '\0')
+            {
+                file_name[j++] = data.buf[i++];
+            }
+            char file_path[CMD_LEN];
+            sprintf(file_path, "downloads/%s/%s", user_name, file_name);
+            if (access(file_path, F_OK) == 0)
+            {
+                system("clear");
+                printf("-----$ %s\n", data.buf);
+                printf("file with the same name already exists\n");
+                continue;
+            }
             strcpy(trans_info.cmd, data.buf);
             pthread_create(&tran_thread, NULL, get_files, &trans_info);
         }

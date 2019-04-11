@@ -46,8 +46,8 @@ void print_help()
     printf("list file:                 ls [<file>]\n");
     printf("print working directory:   pwd\n");
     printf("change directory:          cd <path>\n");
-    printf("download file:             gets <file>, directory not supported\n");
-    printf("upload file:               puts <file>, directory not supported\n");
+    printf("download file:             gets <file>, directory surpported~~\n");
+    printf("upload file:               puts <file>, directory supprted~~\n");
     printf("remove file:               rm <file>, directory supported~~\n");
     printf("make directory:            mkdir <file>, can only create in current directory\n");
     printf("this page:                 --help\n");

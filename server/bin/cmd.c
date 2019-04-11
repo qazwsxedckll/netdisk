@@ -256,7 +256,7 @@ int resolve_mkdir(char*** result, int *n, const char* user_name, const char* cmd
     }
 }
 
-int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* path, MYSQL* conn, const char* root_id, const char* cur_dir_id)
+int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* path, MYSQL* conn, const char* cur_dir_id, const char* root_id)
 {
     char* abs_path;
     MYSQL_RES* res;
@@ -285,8 +285,10 @@ int resolve_gets(char* file_md5, char* file_name, char* file_size, const char* p
     mysql_free_result(res);
     if (atoi(row[2]) == 0)          //is dir
     {
-        //to be complete
-        return -1;
+        strcpy(file_name, row[3]);
+        strcpy(file_size, cur_dir_id); //send cur_dir_id via file_size
+        strcpy(file_md5, "0");
+        return 0;
     }
     else        //is file
     {

@@ -780,57 +780,38 @@ int thread_connect(int* socketFd, DataPackage* data, TransInfo* trans_info, int 
     return 0;
 }
 
-void* get_files(void* p)
+int get_file(int socketFd)
 {
-    int ret, socketFd;
+    int ret;
     DataPackage data;
-    TransInfo* trans_info = (TransInfo*)p;
-    ret = thread_connect(&socketFd, &data, trans_info, 2, trans_info->password);
-    if (ret)
-    {
-        close(socketFd);
-        pthread_exit(NULL);
-    }
-
     ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv filename
     if (ret)
     {
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     ret =recv_cycle(socketFd, data.buf, data.data_len);
     if (ret)
     {
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
-    mkdir("downloads", 0775);
-    char path_name[CMD_LEN];
-    sprintf(path_name, "%s/%s", "downloads", trans_info->user_name);
-    mkdir(path_name, 0775);
-    strcat(path_name, "/");
-    strcat(path_name, data.buf);
-    int fd = open(path_name, O_WRONLY|O_TRUNC|O_CREAT, 0664);
+    int fd = open(data.buf, O_WRONLY|O_TRUNC|O_CREAT, 0664);
     if (fd == -1)
     {
         printf("file creation failed\n");
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
 
     ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv size
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     ret = recv_cycle(socketFd, data.buf, data.data_len);
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     off_t size = atoi(data.buf);
 
@@ -845,8 +826,7 @@ void* get_files(void* p)
         if (ret)
         {
             close(fd);
-            close(socketFd);
-            pthread_exit(NULL);
+            return -1;
         }
         if (data.data_len > 0)
         {
@@ -855,8 +835,7 @@ void* get_files(void* p)
             {
                 printf("transmission interrupted\n");
                 close(fd);
-                close(socketFd);
-                pthread_exit(NULL);
+                return -1;
             }
             ret = write(fd, data.buf, data.data_len);
             if (ret == -1)
@@ -864,8 +843,7 @@ void* get_files(void* p)
                 perror("write");
                 printf("transmission interrupted\n");
                 close(fd);
-                close(socketFd);
-                pthread_exit(NULL);
+                return -1;
             }
             transfered += data.data_len;
             end = time(NULL);
@@ -884,38 +862,132 @@ void* get_files(void* p)
             break;
         }
     }
-    close(socketFd);
-    pthread_exit(NULL);
+    return 0;
 }
 
-void* put_files(void* p)
+int get_dir(int socketFd, char* cur_path)
 {
-    int ret, socketFd;
+    DataPackage data;
+    while (1)
+    {
+        if (recv_cycle(socketFd, (char*)&data.data_len, sizeof(int)))
+        {
+            return -1;
+        }
+
+        if (data.data_len == 0)
+        {
+            if (get_file(socketFd))
+            {
+                return -1;
+            }
+        }
+        else if (data.data_len == 1)
+        {
+            if (recv_cycle(socketFd, (char*)&data.data_len, sizeof(int)))   //recv dir name
+            {
+                return -1;
+            }
+            if (recv_cycle(socketFd, data.buf, data.data_len))
+            {
+                return -1;
+            }
+            if (mkdir(data.buf, 0755))
+            {
+                return -1;
+            }
+            char cur_path[CMD_LEN];
+            getcwd(cur_path, sizeof(cur_path));
+            chdir(data.buf);
+            get_dir(socketFd, cur_path);
+        }
+        else
+        {
+            chdir(cur_path);
+            return 0;
+        }
+    }
+}
+
+void* get_files(void* p)
+{
+    int socketFd;
     DataPackage data;
     TransInfo* trans_info = (TransInfo*)p;
-
-    //open file
-    char file_path[CMD_LEN];
-    int i = 0;
-    while (trans_info->cmd[i] != '\0')
-    {
-        file_path[i] = trans_info->cmd[i + 5];
-        i++;
-    }
-    file_path[i] = '\0';
-    int fd = open(file_path, O_RDONLY);
-    if (fd == -1)
-    {
-        printf("file not exist\n");
-        pthread_exit(NULL);
-    }
-
-    //connection
-    ret = thread_connect(&socketFd, &data, trans_info, 3, trans_info->password);
-    if (ret)
+    if (thread_connect(&socketFd, &data, trans_info, 2, trans_info->password))
     {
         close(socketFd);
         pthread_exit(NULL);
+    }
+
+    mkdir("downloads", 0775);
+    char path_name[CMD_LEN];
+    sprintf(path_name, "%s/%s", "downloads", trans_info->user_name);
+    mkdir(path_name, 0775);
+
+    char cur_path[CMD_LEN];
+    getcwd(cur_path, sizeof(cur_path));
+
+    if (recv_cycle(socketFd, (char*)&data.data_len, sizeof(int)))
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    if (data.data_len == 0)             //0 for file
+    {
+        chdir(path_name);
+        get_file(socketFd);
+        chdir(cur_path);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+    else                                //1 for dir
+    {
+        if (recv_cycle(socketFd, (char*)&data.data_len, sizeof(int)))   //recv dir name
+        {
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+        if (recv_cycle(socketFd, data.buf, data.data_len))
+        {
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        char file_path[CMD_LEN + 100];
+        sprintf(file_path, "downloads/%s/%s", trans_info->user_name, data.buf);
+        if (mkdir(file_path, 0755))
+        {
+            printf("cannot mkdir\n");
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        chdir(file_path);
+        char cur_path[CMD_LEN];
+        getcwd(cur_path, sizeof(cur_path));
+        if (get_dir(socketFd, cur_path))
+        {
+            chdir(cur_path);
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+    printf("All files are downloaded\n");
+    chdir(cur_path);
+    close(socketFd);
+    pthread_exit(NULL);
+    }
+}
+
+int put_file(int socketFd, const char* file_name)
+{
+    int ret;
+    int fd = open(file_name, O_RDONLY);
+    DataPackage data;
+    if (fd == -1)
+    {
+        printf("file not exist\n");
+        return -1;
     }
 
     //send md5
@@ -926,8 +998,7 @@ void* put_files(void* p)
     if(ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     strcpy(data.buf, file_md5);
     data.data_len = strlen(data.buf) + 1;
@@ -935,38 +1006,33 @@ void* put_files(void* p)
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
 
     ret = recv_cycle(socketFd, (char*)&data.data_len, sizeof(int));       //recv md5 confirm
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     ret = recv_cycle(socketFd, data.buf, data.data_len);
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     if (data.data_len == -1)        //server cannot connect database
     {
         printf("transmission interrupted\n");
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     if (data.data_len == 1)         //file already exist
     {
         printf("\ruploading... 100.0%%\n");
         printf("upload success\n");
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     if (data.data_len == 0)
     {
@@ -974,27 +1040,13 @@ void* put_files(void* p)
     }
 
     //send filename
-    char file_name[FILE_NAME_LEN + 1];
-    i = i + 5;
-    while (trans_info->cmd[i] != '/' && trans_info->cmd[i] != ' ')
-    {
-        i--;
-    }
-    i++;
-    int k = 0;
-    while (trans_info->cmd[i] != '\0')
-    {
-        file_name[k++] = trans_info->cmd[i++];
-    }
-    file_name[k] = '\0';
     data.data_len = strlen(file_name) + 1;
     strcpy(data.buf, file_name);
     ret = send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int));
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
 
     //send file size
@@ -1004,8 +1056,7 @@ void* put_files(void* p)
     {
         perror("fstat");
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
     off_t file_size = buf.st_size;
     sprintf(data.buf, "%ld", file_size);
@@ -1014,8 +1065,7 @@ void* put_files(void* p)
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
 
     //send file
@@ -1038,8 +1088,7 @@ void* put_files(void* p)
         if (ret == -1)
         {
             close(fd);
-            close(socketFd);
-            pthread_exit(NULL);
+            return -1;
         }
     }
 
@@ -1049,8 +1098,7 @@ void* put_files(void* p)
     if (ret)
     {
         close(fd);
-        close(socketFd);
-        pthread_exit(NULL);
+        return -1;
     }
 
     //receive confirmation
@@ -1065,6 +1113,189 @@ void* put_files(void* p)
         printf("upload success\n");
     }
     close(fd);
-    close(socketFd);
-    pthread_exit(NULL);
+    return 0;
+}
+
+int put_dir(DIR* dp, int socketFd, char* cur_path)
+{
+    DataPackage data;
+    struct dirent *entry;
+    struct stat stat_buf;
+    while ((entry = readdir(dp)) != NULL)
+    {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+        {
+            continue;
+        }
+        stat(entry->d_name, &stat_buf);
+        if (S_ISDIR(stat_buf.st_mode))
+        {
+            data.data_len = 0;
+            if (send_cycle(socketFd, (char*)&data, sizeof(int)))
+            {
+                return -1;
+            }
+
+            strcpy(data.buf, entry->d_name);
+            data.data_len = strlen(data.buf) + 1;
+            if (send_cycle(socketFd, (char*)&data, data.data_len + sizeof(int)))
+            {
+                return -1;
+            }
+
+            DIR* dp = opendir(entry->d_name);
+            char cur_path[FILE_NAME_LEN];
+            getcwd(cur_path, sizeof(cur_path));
+            chdir(entry->d_name);
+            if (put_dir(dp, socketFd, cur_path))
+            {
+                return -1;
+            }
+        }
+        else
+        {
+            data.data_len = 1;
+            if (send_cycle(socketFd, (char*)&data, sizeof(int)))
+            {
+                return -1;
+            }
+            if (put_file(socketFd, entry->d_name))
+            {
+                return -1;
+            }
+        }
+    }
+    data.data_len = 2;
+    if (send_cycle(socketFd, (char*)&data, sizeof(int)))
+    {
+        return -1;
+    }
+    chdir(cur_path);
+    closedir(dp);
+    return 0;
+}
+
+void* put_files(void* p)
+{
+    int ret, socketFd;
+    DataPackage data;
+    TransInfo* trans_info = (TransInfo*)p;
+
+    char file_path[CMD_LEN] = { 0 };
+    char file_name[FILE_NAME_LEN] = { 0 };
+    char file_dir[FILE_NAME_LEN] = { 0 };
+    int i = 0;
+    while (trans_info->cmd[i + 5] != '\0')
+    {
+        file_path[i] = trans_info->cmd[i + 5];
+        i++;
+    }
+
+    i = strlen(file_path);
+    while (file_path[i] != '/' && i != -1)
+    {
+        i--;
+    }
+    if (i == -1)
+    {
+        file_dir[0] = '.';
+    }
+    else
+    {
+        int j = 0;
+        while (j != i)
+        {
+            file_dir[j] = file_path[j];
+        }
+    }
+    i++;
+    int k = 0;
+    while (file_path[i] != '\0')
+    {
+        file_name[k++] = file_path[i++];
+    }
+
+    //connection
+    ret = thread_connect(&socketFd, &data, trans_info, 3, trans_info->password);
+    if (ret)
+    {
+        close(socketFd);
+        pthread_exit(NULL);
+    }
+
+    struct stat buf;
+    if (stat(file_path, &buf))
+    {
+        printf("file not exist\n");
+        pthread_exit(NULL);
+    }
+    if (S_ISDIR(buf.st_mode))
+    {
+        char cur_path[FILE_NAME_LEN];
+        getcwd(cur_path, sizeof(cur_path));
+        DIR* dp = opendir(file_path);
+
+        if (dp == NULL)
+        {
+            printf("cannot open directory\n");
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+        if (chdir(file_dir))
+        {
+            printf("cannot open directory\n");
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        data.data_len = 0;
+        if (send_cycle(socketFd, (char*)&data, sizeof(int)))
+        {
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        strcpy(data.buf, file_name);
+        data.data_len = strlen(file_name) + 1;
+        if (send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len))    //send dir name
+        {
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        if (chdir(file_path))
+        {
+            printf("cannot open directory\n");
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        put_dir(dp, socketFd, cur_path);
+        close(socketFd);
+        pthread_exit(NULL);
+
+    }
+    else
+    {
+        char cur_path[FILE_NAME_LEN];
+        getcwd(cur_path, sizeof(cur_path));
+        if (chdir(file_dir))
+        {
+            printf("cannot open directory\n");
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        data.data_len = 1;
+        if (send_cycle(socketFd, (char*)&data, sizeof(int)))
+        {
+            close(socketFd);
+            pthread_exit(NULL);
+        }
+
+        put_file(socketFd, file_name);
+        chdir(cur_path);
+        close(socketFd);
+        pthread_exit(NULL);
+    }
 }
