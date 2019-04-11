@@ -9,12 +9,16 @@ int send_cycle(int fd, const char* data, int send_len)
         ret = send(fd, data + total, send_len - total, 0);
         if (ret == -1)
         {
+#ifdef _DEBUG
             printf("transmission interrupted\n");
+#endif
             return -1;
         }
         if (ret == 0)
         {
+#ifdef _DEBUG
             printf("transmission closed\n");
+#endif
             return -1;
         }
         total = total + ret;
@@ -31,12 +35,16 @@ int recv_cycle(int fd, char* data, int recv_len)
         ret = recv(fd, data + total, recv_len - total, 0);
         if (ret == -1)
         {
+#ifdef _DEBUG
             printf("transmission interrupted\n");
+#endif
             return -1;
         }
         if (ret == 0)
         {
+#ifdef _DEBUG
             printf("transmission closed\n");
+#endif
             return -1;
         }
         total = total + ret;

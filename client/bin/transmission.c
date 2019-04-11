@@ -1245,6 +1245,7 @@ void* put_files(void* p)
         if (chdir(file_dir))
         {
             printf("cannot open directory\n");
+            chdir(cur_path);
             close(socketFd);
             pthread_exit(NULL);
         }
@@ -1253,6 +1254,7 @@ void* put_files(void* p)
         if (send_cycle(socketFd, (char*)&data, sizeof(int)))
         {
             close(socketFd);
+            chdir(cur_path);
             pthread_exit(NULL);
         }
 
@@ -1261,18 +1263,22 @@ void* put_files(void* p)
         if (send_cycle(socketFd, (char*)&data, sizeof(int) + data.data_len))    //send dir name
         {
             close(socketFd);
+            chdir(cur_path);
             pthread_exit(NULL);
         }
 
-        if (chdir(file_path))
+        if (chdir(file_name))
         {
-            printf("cannot open directory\n");
+            printf("cannot open directory3\n");
+            chdir(cur_path);
             close(socketFd);
             pthread_exit(NULL);
         }
 
         put_dir(dp, socketFd, cur_path);
+        chdir(cur_path);
         close(socketFd);
+        printf("All files uploaded\n");
         pthread_exit(NULL);
 
     }
@@ -1281,6 +1287,7 @@ void* put_files(void* p)
         if (chdir(file_dir))
         {
             printf("cannot open directory\n");
+            chdir(cur_path);
             close(socketFd);
             pthread_exit(NULL);
         }
@@ -1289,6 +1296,7 @@ void* put_files(void* p)
         if (send_cycle(socketFd, (char*)&data, sizeof(int)))
         {
             close(socketFd);
+            chdir(cur_path);
             pthread_exit(NULL);
         }
 
