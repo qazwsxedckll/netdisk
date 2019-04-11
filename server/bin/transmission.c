@@ -527,7 +527,6 @@ int recv_dir(int client_fd, const char* user_name, char* cur_dir_id, MYSQL* conn
         }
         else if (data.data_len == 2)
         {
-            printf("returned\n");
             return 0;
         }
     }

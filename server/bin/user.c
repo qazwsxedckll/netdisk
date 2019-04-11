@@ -23,7 +23,6 @@ int user_verify(MYSQL* conn, const char* user_name, const char* password)
         sprintf(tmp, "%02x", md[i]);
         strcat(sha_password, tmp);
     }
-    printf("%s\n", sha_password);
     if (strcmp(sha_password, row[2]) == 0)
     {
 #ifdef _DEBUG
