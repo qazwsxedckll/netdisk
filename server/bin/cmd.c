@@ -37,9 +37,17 @@ char* convert_path(const char* path, MYSQL* conn, const char* root_id, const cha
     if (path[0] == '.' && path[1] == '.')       //start with parent dir
     {
         res = sql_select(conn, "file", "id", cur_dir_id, 0);
+        if (res == NULL)
+        {
+            return NULL;
+        }
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         res = sql_select(conn, "file", "id", row[1], 0);
+        if (res == NULL)
+        {
+            return NULL;
+        }
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         if (atoi(row[1]) == -1)
@@ -66,6 +74,10 @@ char* convert_path(const char* path, MYSQL* conn, const char* root_id, const cha
     else        //start with cur dir
     {
         res = sql_select(conn, "file", "id", cur_dir_id, 0);
+        if (res == NULL)
+        {
+            return NULL;
+        }
         row = mysql_fetch_row(res);
         mysql_free_result(res);
         if (strcmp(path, "./") == 0 || strcmp(path, ".") == 0)
@@ -339,7 +351,7 @@ int resolve_rm(char*** result, int *n, const char* cmd_path, MYSQL* conn, const 
     MYSQL_RES* res;
     MYSQL_RES* md5_res;
     MYSQL_ROW row;
-
+    
     abs_path = convert_path(cmd_path, conn, root_id, cur_dir_id);
     if (abs_path == NULL)
     {
