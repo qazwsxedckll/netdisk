@@ -925,8 +925,8 @@ void* get_files(void* p)
     sprintf(path_name, "%s/%s", "downloads", trans_info->user_name);
     mkdir(path_name, 0775);
 
-    char cur_path[CMD_LEN];
-    getcwd(cur_path, sizeof(cur_path));
+    char main_path[CMD_LEN];
+    getcwd(main_path, sizeof(main_path));
 
     if (recv_cycle(socketFd, (char*)&data.data_len, sizeof(int)))
     {
@@ -937,7 +937,7 @@ void* get_files(void* p)
     {
         chdir(path_name);
         get_file(socketFd);
-        chdir(cur_path);
+        chdir(main_path);
         close(socketFd);
         pthread_exit(NULL);
     }
@@ -973,7 +973,7 @@ void* get_files(void* p)
             pthread_exit(NULL);
         }
     printf("All files are downloaded\n");
-    chdir(cur_path);
+    chdir(main_path);
     close(socketFd);
     pthread_exit(NULL);
     }
@@ -1206,6 +1206,7 @@ void* put_files(void* p)
         while (j != i)
         {
             file_dir[j] = file_path[j];
+            j++;
         }
     }
     i++;
@@ -1223,6 +1224,8 @@ void* put_files(void* p)
         pthread_exit(NULL);
     }
 
+    char cur_path[FILE_NAME_LEN];
+    getcwd(cur_path, sizeof(cur_path));
     struct stat buf;
     if (stat(file_path, &buf))
     {
@@ -1231,8 +1234,6 @@ void* put_files(void* p)
     }
     if (S_ISDIR(buf.st_mode))
     {
-        char cur_path[FILE_NAME_LEN];
-        getcwd(cur_path, sizeof(cur_path));
         DIR* dp = opendir(file_path);
 
         if (dp == NULL)
@@ -1277,8 +1278,6 @@ void* put_files(void* p)
     }
     else
     {
-        char cur_path[FILE_NAME_LEN];
-        getcwd(cur_path, sizeof(cur_path));
         if (chdir(file_dir))
         {
             printf("cannot open directory\n");

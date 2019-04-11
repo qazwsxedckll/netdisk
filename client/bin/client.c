@@ -77,8 +77,8 @@ int cmd_interpret(const DataPackage* data)
                     && strcmp(prefix, "mkdir"))
                 {
                     system("clear");
-                    printf("-----$ %s\n", data->buf);
                     printf("invaild command\n");
+                    printf("-----$ %s\n", data->buf);
                     return -1;
                 }
             }
