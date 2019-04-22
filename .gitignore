@@ -54,9 +54,7 @@ dkms.conf
 # custom
 netdisk/
 core
-!client.exe
 client/downloads
 server/keys
-server_rsa.key
 client/*.key
-!client/server_rsa_pub.key
+server/*.key

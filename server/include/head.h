@@ -26,7 +26,8 @@
 #include <openssl/sha.h>
 #include <openssl/err.h>
 
-/* #define _DEBUG */
+#define _DEBUG
+
 #define RESULT_LEN 1000
 #define INT_LEN 12
 #define MD5_LEN 150

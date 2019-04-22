@@ -23,6 +23,10 @@ int main(int argc, char** argv)
 
     int ret;
 
+    //mkdir
+    mkdir("keys", 0775);
+    mkdir("netdisk", 0775);
+
     //read configuration
 #ifdef _DEBUG
     printf("reading configuration file\n");
